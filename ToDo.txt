@@ -1,0 +1,33 @@
+Todo list:
+
+Ideas:
+See if a BUS can be implemented. The CPU will send Address and Data to BUS,
+BUS will decode what device this address is mapped to and forward request
+to that device. 
+
+Will need CPU control signals available to BUS:
+1) RD/WR
+2) ME0 ME1 
+3) PU PV 
+
+
+All V register opcodes:
+All opcodes using V register are wrong! V does nto work like other registers.
+
+Not implemented:
+ITA - Input Port IN0-7 to accumulator -> Need BUS first
+ATP - Accumulator to Data bus, X to Address bus -> Need BUS first
+CDV - Clear internal clock divider? Not sure important for emulation.
+OFF - BF Flip flop reset. What does it do?
+
+BFO, BFI 
+BF flipflop output (BFO) and input (BFI). The BF flipflop is reset by the OFF 
+instruction from the CPU  and will be set when the input BFI is turned to high level. 
+BFO is in low level when the BF flipflop is set and in high level when reset. 
+As VGG is power supply to the BF flipflop, the contents of the flipflop are retained as 
+long as VGG is in supply. 
+Normally, it is used for memory backup system. 
+
+Misc:
+
+See if can be simplified:
