@@ -1,0 +1,12 @@
+.ORIGIN 1000
+1000 - SIE      - FD 81
+1002 - PSH X    - FD 88
+1004 - POP A    - FD 8A
+1006 - DCA #(X) - FD 8C
+1008 - CDV      - FD 8E
+100A - 
+
+
+
+
+FD 81 FD 88 FD 8A FD 8C FD 8E

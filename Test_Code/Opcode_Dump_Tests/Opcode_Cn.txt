@@ -1,0 +1,20 @@
+.ORIGIN 1000
+1000 - VEJ (C0)  - C0
+1001 - VCR n     - C1 1A
+1003 - VEJ (C2)  - C2
+1004 - VCS n     - C3 1B
+1006 - VEJ (C4)  - C4 
+1007 - VHR n     - C5 1C
+1009 - VEJ (C6)  - C6 
+100A - VHS n     - C7 1D
+100C - VEJ (C8)  - C8 
+100D - VZR n     - C9 1E
+100F - VEJ (CA)  - CA 
+1010 - VZS n     - CB 1F
+1012 - VEJ (CC)  - CC
+1013 - VMJ n     - CD 20
+1015 - VEJ (CE)  - CE 
+1016 - VVS n     - CF 21
+1018
+
+C0 C1 1A C2 C3 1B C4 C5 1C C6 C7 1D C8 C9 1E CA CB 1F CC CD 20 CE CF 21

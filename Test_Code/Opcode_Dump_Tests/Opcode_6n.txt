@@ -1,0 +1,20 @@
+.ORIGIN 1000
+1000 - INC UL    - 60
+1001 - SIN U     - 61
+1002 - DEC UL    - 62
+1003 - SDE U     - 63
+1004 - INC U     - 64
+1005 - LIN U     - 65
+1006 - DEC U     - 66
+1007 - LDE U     - 67
+1008 - LDI UH,n  - 68 1A
+100A - ANI (U),n - 69 1B
+100C - LDI UL,n  - 6A 1C
+100E - ORI (U),n - 6B 1D
+1010 - CPI UH,n  - 6C 1E
+1012 - BII (U),n - 6D 1F
+1014 - CPI UL,n  - 6E 20
+1016 - ADI (U),n - 6F 21
+1018
+
+60 61 62 63 64 65 66 67 68 1A 69 1B 6A 1C 6B 1D 6C 1E 6D 1F 6E 20 6F 21

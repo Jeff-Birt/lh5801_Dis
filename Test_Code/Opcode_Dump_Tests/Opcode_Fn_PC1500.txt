@@ -1,0 +1,17 @@
+.ORIGIN 1000
+1000 - VEJ (F0)  - F0
+1001 - AEX       - F1
+1002 - VEJ (F2)  - F2
+1003 - VEJ (F4)  - F4 78 99		; w1
+1006 - TIN       - F5 
+1007 - VEJ (F6)  - F6 78 86		; w1
+100A - CIN       - F7
+100B - VEJ (F8)  - F8 
+100C - REC       - F9
+100D - VEJ (FA)  - FA 
+100E - SEC       - FB
+100F - VEJ (FC)  - FC
+1010 - VEJ (FE)  - FE
+
+
+F0 F1 F2 F4 78 99 F5 F6 78 86 F7 F8 F9 FA FB FC FE

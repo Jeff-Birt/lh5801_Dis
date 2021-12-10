@@ -1,0 +1,49 @@
+         11111111112222222222333333333344444444445
+12345678901234567890123456789012345678901234567890      
+   |   |                        |                |    
+Adr.   Raw		        Disassembled     
+1000   00		        SBC  XL          
+			        ORI  #(X),$FF    
+1000   FD E9 FF FF FF FF FF FF 	ANI  ($FFFF),$FF 
+			        ANI  #($FFFF),$FF 
+			        LOP  UL,$FF
+
+			LABEL:
+8280	FD 8A           POP  A                           ;
+8282	FD 2A           POP  U                           ;
+8284	91 2C           BCR- BRANCH_825A                 ; Carry Clear = Success
+
+
+
+Lable   =oper.  value   comment
+P3      .equ    0B0H    ;Port 3
+IP      .equ    0B8H
+T2CON     =     0C8H    ;8052, 80154 only
+RCAP2L    =     0CAH    ;8052, 80154 only
+
+
+
+.FRAGMENTS:	40C5
+	CODE	40C5
+	TEXT	40C5
+	COMMENT	TopHeader STRUCT basfile_header ELEMENT 0
+	BYTE	40D0
+	WORD	40D1
+	WORD	40D3
+	TEXT	40DF
+	COMMENT	TopHeader STRUCT basfile_header ELEMENT 1
+
+Regex
+
+Hex values with optional $ prefix or optional H suffix: [$]?[0-9a-fA-F]+[H]?$ 
+Hex values with optional $ prefix or optional H suffix: ^0[xX]?|[$]?[0-9a-fA-F]+[H]?$ (supports 0x, 0X)
+Comment, starts with semicolon: ^[;]
+Is ".equ" or "=" only: ^.equ$|^=$  
+Is ".equ" or "equ" or "=" only: ^[.]?equ$|^=$
+Is lable ^[a-zA-Z0-9_-]*$
+
+disSB.Append("BCS+ ");
+disSB.AppendLine(GetAddOrLable(address));
+disSB.AppendLine(String.Format("LDI  XH,${0:X2}", value));
+disSB.AppendLine(String.Format("BCS+ {0}", GetAddOrLabel(address)));
+disSB.AppendLine(String.Format("ANI  ({0}),${1:X2}", GetAddOrLabel(address), value));

@@ -1,0 +1,20 @@
+.ORIGIN 1000
+1000 - INC YL    - 50
+1001 - SIN Y     - 51
+1002 - DEC YL    - 52
+1003 - SDE Y     - 53
+1004 - INC Y     - 54
+1005 - LIN Y     - 55
+1006 - DEC Y     - 56
+1007 - LDE Y     - 57
+1008 - LDI YH,n  - 58 1A
+100A - ANI (Y),n - 59 1B
+100C - LDI YL,n  - 5A 1C
+100E - ORI (Y),n - 5B 1D
+1010 - CPI YH,n  - 5C 1E
+1012 - BII (Y),n - 5D 1F
+1014 - CPI YL,n  - 5E 20
+1016 - ADI (Y),n - 5F 21
+1018
+
+50 51 52 53 54 55 56 57 58 1A 59 1B 5A 1C 5B 1D 5C 1E 5D 1F 5E 20 5F 21

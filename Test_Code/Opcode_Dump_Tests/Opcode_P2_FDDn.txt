@@ -1,0 +1,11 @@
+.ORIGIN 1000
+1000 - DRR #(X) - FD D3
+1002 - DRL #(X) - FD D7
+1004 - ADR Y    - FD DA
+1006 - AM1      - FD DE
+100C - 
+
+
+
+
+FD D3 FD D7 FD DA FD DE

@@ -1,0 +1,20 @@
+.ORIGIN 1000
+1000 - INC XL    - 40
+1001 - SIN X     - 41
+1002 - DEC XL    - 42
+1003 - SDE X     - 43
+1004 - INC X     - 44
+1005 - LIN X     - 45
+1006 - DEC X     - 46
+1007 - LDE X     - 47
+1008 - LDI XH,n  - 48 1A
+100A - ANI (X),n - 49 1B
+100C - LDI XL,n  - 4A 1C
+100E - ORI (X),n - 4B 1D
+1010 - CPI XH,n  - 4C 1E
+1012 - BII (X),n - 4D 1F
+1014 - CPI XL,n  - 4E 20
+1016 - ADI (X),n - 4F 21
+100A
+
+40 41 42 43 44 45 46 47 48 1A 49 1B 4A 1C 4B 1D 4C 1E 4D 1F 4E 20 4F 21

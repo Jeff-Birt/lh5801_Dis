@@ -1,0 +1,18 @@
+.ORIGIN 1000
+1000 - VEJ (E0)  - E0
+1001 - SPU       - E1
+1002 - VEJ (E2)  - E2
+1003 - RPU       - E3
+1004 - VEJ (E4)  - E4 
+1005 - VEJ (E6)  - E6 
+1006 - VEJ (E8)  - E8 
+1007 - ANI (pp),n- E9 1A55 2A
+100B - VEJ (EA)  - EA 
+100C - ORI (pp),n- EB 1B55 2B
+1010 - VEJ (EC)  - EC
+1011 - BII (pp),n- ED 1C55 2C
+1015 - VEJ (EE)  - EE 
+1016 - ADI (pp),n- EF 1D55 2D
+101A
+
+E0 E1 E2 E3 E4 E6 E8 E9 1A 55 2A EA EB 1B 55 2B EC ED 1C 55 2C EE EF 1D 55 2D

@@ -1,0 +1,12 @@
+.ORIGIN 1000
+1000 - HLT      - FD B1
+1002 - PSH V    - FD B8
+1004 - ITA      - FD BA
+1006 - DCA #(V) - FD BC
+1008 - RIE      - FD BE
+100A - 
+
+
+
+
+FD B1 FD B8 FD BA FD BC FD BE

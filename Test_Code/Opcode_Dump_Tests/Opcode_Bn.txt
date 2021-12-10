@@ -1,0 +1,20 @@
+.ORIGIN 1000
+1000 - SBC VH    - B0
+1001 - SBI A,n   - B1 1A
+1003 - ADC VH    - B2
+1004 - ADI A,n   - B3 1B
+1006 - LDA VH    - B4 
+1007 - LDI A,n   - B5 1C
+1009 - CPA VH    - B6 
+100A - CPI A,n   - B7 1D
+100C - RPV       - B8 
+100D - ANI A,n   - B9 1E
+100F - JMP pp    - BA 1F55
+1012 - ORI A,n   - BB 20
+1014 - DCA (V)   - BC
+1015 - EAI n     - BD 21
+1017 - SJP pp    - BE 2255
+101A - BII A,n   - BF 23
+1012
+
+B0 B1 1A B2 B3 1B B4 B5 1C B6 B7 1D B8 B9 1E BA 1F 55 BB 20 BC BD 21 BE 22 55 BF 23

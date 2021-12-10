@@ -1,0 +1,13 @@
+.ORIGIN 1000
+1000 - RDP      - FD C0
+1002 - SDP      - FD C1
+1004 - PSH A    - FD C8
+1006 - ADR X    - FD CA
+1008 - ATP      - FD CC
+100A - AM0      - FD CE
+100C - 
+
+
+
+
+FD C0 FD C1 FD C8 FD CA FD CC FD CE

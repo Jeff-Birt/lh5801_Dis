@@ -1,0 +1,16 @@
+.ORIGIN 1000
+1000 - INC XH     - FD 40
+1002 - DEC XH     - FD 42
+1004 - LDX  S     - FD 48
+1006 - ANI #(X),n - FD 49 1A
+1009 - STX X      - FD 4A
+100B - ORI #(X),n - FD 4B 1B
+100E - OFF        - FD 4C
+1010 - BII #(X),n - FD 4D 1C
+1013 - STX S      - FD 4E
+1015 - ADI #(X),n - FD 4F 1D
+1018 - 
+
+
+
+FD 40 FD 42 FD 48 FD 49 1A FD 4A FD 4B 1B FD 4C FD 4D 1C FD 4E FD 4F 1D

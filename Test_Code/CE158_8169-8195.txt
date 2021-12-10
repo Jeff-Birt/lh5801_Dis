@@ -1,0 +1,22 @@
+
+SUB_8169:
+8169	FD C8               PSH	    A                 
+816B	B5 7F               LDI	    A,7F              
+816D	FD AE D0 0D         STA     #(CE158_PRT_B_DIR)
+8171	FD A5 D0 0E         LDA     #(CE158_PRT_A)    
+8175	FD A9 D0 0E         AND     #(CE158_PRT_A)    
+8179	D9                  SHL                       
+817A	D9                  SHL                       
+817B	D9                  SHL                       
+817C	FD 8A               POP	    A                 
+817E	83 38               BCS+    BRANCH_81B8       
+8180	FD ED D0 0F 80      BII     #(CE158_PRT_B),80 
+8185	8B A5               BZS+    BRANCH_822C       
+8187	FD E9 D0 08 9F      ANI     #(CE158_PRT_C),9F 
+818C	BD FF               EAI	    FF                
+818E	D5                  SHR                       
+818F	81 05               BCR+    BRANCH_8196       
+8191	FD EB D0 08 20      ORI     #(CE158_PRT_C),20 
+
+
+FD C8 B5 7F FD AE D0 0D FD A5 D0 0E FD A9 D0 0E D9 D9 D9 FD 8A 83 38 FD ED D0 0F 80 8B A5 FD E9 D0 08 9F BD FF D5 81 05 FD EB D0 08 20

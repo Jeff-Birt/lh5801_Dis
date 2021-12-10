@@ -1,0 +1,23 @@
+.ORIGIN 1000
+1000 - VEJ (C0)  - C0
+1001 - VCR n     - C1 00 01 08 11	; Vector 00 -> b1, b2, o1 - If UL in internval b1-b2, if not branch o1
+1006 - VEJ (C2)  - C2 30 31		; *p, 01
+1009 - VEJ (C2)  - C2 F1 AE 07		; *p, 01
+100D - VCS n     - C3 04 AA		; o1 - like (C8), but characters already in U- Reg, if not EOL branch o1
+1010 - VEJ (C4)  - C4 2C 1A
+1013 - VEJ (C4)  - C4 F1 94 2F
+1017 - VHR n     - C5 0E AA 21		; Vector 0E -> b1, o1 - add. of var.name encoded in U-Reg. Name #bytes b1, err. branch o1
+101B - VEJ (C6)  - C6 
+101C - VHS n     - C7 10 55		; b1 - Convert U-Reg according to the data byte. b1 = converstion type
+101F - VEJ (C8)  - C8 04		; o1
+1021 - VZR n     - C9 2A 55 AA		; b1, b2 - transfers system messages. b1 = Start address, b2 = data bytes
+1025 - VEJ (CA)  - CA 65		; 78b1 - Transfers X to 78(b1), 78(b1+1)
+1027 - VZS n     - CB 2C 1A		; 78b1 - Formula evaluation, b1 is low byte of $78nn address
+102A - VEJ (CC)  - CC 33		; 78b1 - 
+102C - VMJ n     - CD 34 01 20 10 21 20	; b1, n of (b2 o1) - Syntax check & multi branching, b1 # of match pairs (0-#), b2 char to match, o1 branch if match
+1033 - VEJ (CE)  - CE 58 7A		; b1,o1 - 
+1036 - VVS n     - CF F4 55 AA		; w1 - Loads U-Reg with address from main memory (w1)
+103A
+
+
+C0 C1 1A C2 30 31 C2 F1 AE 07 C3 1B C4 2C 1A C4 F1 94 2F C5 1C C6 C7 1D C8 04 C9 1E CA 65 CB 1F CC 33 CD 20 CE 58 7A CF 21
