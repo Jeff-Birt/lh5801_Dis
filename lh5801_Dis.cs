@@ -24,6 +24,8 @@ namespace lh5801_Dis
             SKIP
         }
 
+        #region evil_globals
+
         private SEGMENT SegmentMode = SEGMENT.CODE; // default to CODE mode
         private ushort SegmentEnd = 0x0000;         // last address of current SegmentMode
         Dictionary<ushort, SEGMENT> SegmentDict;    // Holds address/FRAG type pairs
@@ -55,6 +57,8 @@ namespace lh5801_Dis
         System.Text.RegularExpressions.Regex isEqu       = new System.Text.RegularExpressions.Regex("^[.]?equ$|^=$");
         System.Text.RegularExpressions.Regex isComment   = new System.Text.RegularExpressions.Regex("^[;]");
 
+        #endregion evil_globals
+
         /// <summary>
         /// The constructonator
         /// </summary>
@@ -64,7 +68,6 @@ namespace lh5801_Dis
             ConfigDelegates();
             ConfigOpcodeBytesTables();
             ReadLibFile();
-            //ConfigureSegmentDictionary();
         }
 
         #region Configuration 
@@ -1013,14 +1016,14 @@ namespace lh5801_Dis
         /// <param name="numBytes"># of bytes in this line</param>
         private void LineDump(ushort start, int numBytes)
         {
-            disSB.AppendFormat("{0:X4}   ", start); // address
+            disSB.Append(String.Format("{0:X4}   ", start)); // address
 
             // max 8 bytes
             for (ushort i = 0; i < 8; i++)
             {
                 if (i < numBytes)
                 {
-                    disSB.AppendFormat("{0:X2} ", RAM_ME0[start + i]);
+                    disSB.Append(String.Format("{0:X2} ", RAM_ME0[start + i]));
                 }
                 else
                 {
@@ -1033,11 +1036,10 @@ namespace lh5801_Dis
         /// <summary>
         /// Dump label for this address
         /// </summary>
-        /// <param name="label"></param>
-        private void LabelDump(string label)
+        /// <param name="lable"></param>
+        private void LableDump(string label)
         {
-            disSB.AppendLine(""); // blank line before label
-            disSB.AppendLine(label + ":");
+            disSB.Append(String.Format("{1}{0}:{1}", label, Environment.NewLine));
         }
 
         /// <summary>
@@ -1069,28 +1071,34 @@ namespace lh5801_Dis
         {
             bool match = false;
             ushort i = 0;
+            SegmentEnd = 65535;
 
-            //iterate through frag dictionary, stop iterating when match found
-            do
+            // use default of CODE segmetn mode if libFile read not enabled
+            if (libFileEnable)
             {
-                if (address >= SegmentDict.ElementAt(i).Key)
+                //iterate through frag dictionary, stop iterating when match found
+                do
                 {
-                    SegmentMode = SegmentDict.ElementAt(i).Value;
-
-                    if (i + 1 < SegmentDict.Count)
+                    if (address >= SegmentDict.ElementAt(i).Key)
                     {
-                        // set FragEnd to address of next fragment if one exists
-                        SegmentEnd = (ushort)(SegmentDict.ElementAt(i + 1).Key - 1);
-                    }
-                    else
-                    {
-                        SegmentEnd = 65535;
-                    }
-                }
+                        SegmentMode = SegmentDict.ElementAt(i).Value;
+                        match = true;
 
-                i++;
+                        if (i + 1 < SegmentDict.Count)
+                        {
+                            // set FragEnd to address of next fragment if one exists
+                            SegmentEnd = (ushort)(SegmentDict.ElementAt(i + 1).Key - 1);
+                        }
+                        //else
+                        //{
+                        //    SegmentEnd = 65535;
+                        //}
+                    }
 
-            } while (!match && i < SegmentDict.Count);
+                    i++;
+
+                } while (!match && i < SegmentDict.Count);
+            }
         }
 
         #endregion Helpers
@@ -1369,12 +1377,12 @@ namespace lh5801_Dis
                 if (P > SegmentEnd)
                 {
                     FindNextSegment(P);
-                    disSB.AppendLine(""); // blank line between segments
+                    disSB.Append(String.Format("{0}", Environment.NewLine)); // blank line between segments
                 }
                 ushort stop = Math.Min(SegmentEnd, end);
 
                 // if we have a label for this address output it
-                if (addressLabels && lableDict.ContainsKey(P)) { LabelDump(lableDict[P]); }
+                if (addressLabels && lableDict.ContainsKey(P)) { LableDump(lableDict[P]); }
 
                 // Choose handler based on SEGMENT mode
                 switch (SegmentMode)
@@ -1425,13 +1433,12 @@ namespace lh5801_Dis
         /// <summary>
         /// Handles CODE segments, disassembles given segment range
         /// </summary>
+        /// Listformat handled by individual opcode functions
         /// <param name="end"></param>
         private void CodeSegmentHandler(ushort stop)
         {
             while (P <= stop)
             {
-                //if (listFormat) { LineDump(P, Math.Min(bytesLeft, 8)); } // dump bytes
-
                 byte opcode = RAM_ME0[P];   // grab next opcode
                 delegatesTbl1[opcode].DynamicInvoke();
             }
@@ -1453,12 +1460,12 @@ namespace lh5801_Dis
                 int lineCount = 0;
                 while (lineCount < 8 && P <= stop)
                 {
-                    disSB.AppendFormat("${0:X2},", RAM_ME0[P]);
+                    disSB.Append(String.Format("${0:X2},", RAM_ME0[P]));
                     lineCount++;
                     P++;
                 }
                 disSB.Replace(",", "", disSB.Length-1, 1);
-                disSB.AppendLine("");
+                disSB.Append(String.Format("{0}", Environment.NewLine));
             }
         }
 
@@ -1479,12 +1486,12 @@ namespace lh5801_Dis
                 while (lineCount < 8 && P <= stop)
                 {
                     ushort word = (ushort)((RAM_ME0[P] << 8) & RAM_ME0[P + 1]);
-                    disSB.AppendFormat("${0:X4},", word);
+                    disSB.Append(String.Format("${0:X4},", word));
                     lineCount++;
                     P++;
                 }
                 disSB.Replace(",", "", disSB.Length - 1, 1);
-                disSB.AppendLine("");
+                disSB.Append(String.Format("{0}", Environment.NewLine));
             }
         }
 
@@ -1499,11 +1506,11 @@ namespace lh5801_Dis
 
             while (P <= stop)
             {
-                disSB.AppendFormat("{0}", (char)(RAM_ME0[P]));
+                disSB.Append(String.Format("{0}", (char)(RAM_ME0[P])));
                 P++;
             }
 
-            disSB.AppendLine("\"");
+            disSB.Append(String.Format("\"{0}", Environment.NewLine));
 
         }
 
@@ -1515,7 +1522,7 @@ namespace lh5801_Dis
         {
             while (P <= stop)
             {
-                disSB.AppendFormat(";${0:X4} to ${1:X4} skipped", P, stop);
+                disSB.Append(String.Format(";${0:X4} to ${1:X4} skipped", P, stop));
                 P = (ushort)(stop + 1); // make sure not over ushort range
             }
         }
@@ -1537,8 +1544,7 @@ namespace lh5801_Dis
             if (listFormat) { LineDump(P, opBytesP1[0x00]); } // dump bytes
 
             P += 1; // advance Program Counter
-            disSB.AppendLine("SBC  XL");
-            //tick += 6;
+            disSB.Append(String.Format("SBC  XL{0}", Environment.NewLine));
         }
 
         /// <summary>
@@ -1551,7 +1557,7 @@ namespace lh5801_Dis
             if (listFormat) { LineDump(P, opBytesP1[0x01]); } // dump bytes
 
             P += 1; // advance Program Counter
-            disSB.AppendLine("SBC  (X)");
+            disSB.Append(String.Format("SBC  (X){0}", Environment.NewLine));
             //tick += 7;
         }
 
@@ -1565,7 +1571,7 @@ namespace lh5801_Dis
             if (listFormat) { LineDump(P, opBytesP1[0x02]); } // dump bytes
 
             P += 1; // advance Program Counter
-            disSB.AppendLine("ADC  XL");
+            disSB.Append(String.Format("ADC  XL{0}", Environment.NewLine));
             //tick += 6;
         }
 
@@ -1579,7 +1585,7 @@ namespace lh5801_Dis
             if (listFormat) { LineDump(P, opBytesP1[0x03]); } // dump bytes
 
             P += 1; // advance Program Counter
-            disSB.AppendLine("ADC  (X)");
+            disSB.Append(String.Format("ADC  (X){0}", Environment.NewLine));
         }
 
         /// <summary>
@@ -1592,7 +1598,7 @@ namespace lh5801_Dis
             if (listFormat) { LineDump(P, opBytesP1[0x04]); } // dump bytes
 
             P += 1; // advance Program Counter
-            disSB.AppendLine("LDA  XL");
+            disSB.Append(String.Format("LDA  XL{0}", Environment.NewLine));
             //tick += 5;
         }
 
@@ -1606,7 +1612,7 @@ namespace lh5801_Dis
             if (listFormat) { LineDump(P, opBytesP1[0x05]); } // dump bytes
 
             P += 1; // advance Program Counter
-            disSB.AppendLine("LDA  (X)");
+            disSB.Append(String.Format("LDA  (X){0}", Environment.NewLine));
             //tick += 6;
         }
 
@@ -1620,7 +1626,7 @@ namespace lh5801_Dis
             if (listFormat) { LineDump(P, opBytesP1[0x06]); } // dump bytes
 
             P += 1; // advance Program Counter
-            disSB.AppendLine("CPA  XL");
+            disSB.Append(String.Format("CPA  XL{0}", Environment.NewLine));
             //tick += 6;
         }
 
@@ -1634,7 +1640,7 @@ namespace lh5801_Dis
             if (listFormat) { LineDump(P, opBytesP1[0x07]); } // dump bytes
 
             P += 1; // advance Program Counter
-            disSB.AppendLine("CPA  (X)");
+            disSB.Append(String.Format("CPA  (X){0}", Environment.NewLine));
             //tick += 7;
         }
 
@@ -1648,7 +1654,7 @@ namespace lh5801_Dis
             if (listFormat) { LineDump(P, opBytesP1[0x08]); } // dump bytes
 
             P += 1; // advance Program Counter
-            disSB.AppendLine("STA  XH");
+            disSB.Append(String.Format("STA  XH{0}", Environment.NewLine));
             //tick += 5;
         }
 
@@ -1662,7 +1668,7 @@ namespace lh5801_Dis
             if (listFormat) { LineDump(P, opBytesP1[0x09]); } // dump bytes
 
             P += 1; // advance Program Counter
-            disSB.AppendLine("AND  (X)");
+            disSB.Append(String.Format("AND  (X){0}", Environment.NewLine));
             //tick += 7;
         }
 
@@ -1676,7 +1682,7 @@ namespace lh5801_Dis
             if (listFormat) { LineDump(P, opBytesP1[0x0A]); } // dump bytes
 
             P += 1; // advance Program Counter
-            disSB.AppendLine("STA  XL");
+            disSB.Append(String.Format("STA  XL{0}", Environment.NewLine));
             //tick += 5;
         }
 
@@ -1690,7 +1696,7 @@ namespace lh5801_Dis
             if (listFormat) { LineDump(P, opBytesP1[0x0B]); } // dump bytes
 
             P += 1; // advance Program Counter
-            disSB.AppendLine("ORA  (X)");
+            disSB.Append(String.Format("ORA  (X){0}", Environment.NewLine));
             //tick += 7;
         }
 
@@ -1704,7 +1710,7 @@ namespace lh5801_Dis
             if (listFormat) { LineDump(P, opBytesP1[0x0C]); } // dump bytes
 
             P += 1; // advance Program Counter
-            disSB.AppendLine("DCS  (X)");
+            disSB.Append(String.Format("DCS  (X){0}", Environment.NewLine));
             //tick += 13;
         }
 
@@ -1718,7 +1724,7 @@ namespace lh5801_Dis
             if (listFormat) { LineDump(P, opBytesP1[0x0D]); } // dump bytes
 
             P += 1; // advance Program Counter
-            disSB.AppendLine("EOR  (X)");
+            disSB.Append(String.Format("EOR  (X){0}", Environment.NewLine));
             //tick += 7;
         }
 
@@ -1732,7 +1738,7 @@ namespace lh5801_Dis
             if (listFormat) { LineDump(P, opBytesP1[0x0E]); } // dump bytes
 
             P += 1; // advance Program Counter
-            disSB.AppendLine("STA  (X)");
+            disSB.Append(String.Format("STA  (X){0}", Environment.NewLine));
             //tick += 6;
         }
 
@@ -1747,7 +1753,7 @@ namespace lh5801_Dis
             if (listFormat) { LineDump(P, opBytesP1[0x0F]); } // dump bytes
 
             P += 1; // advance Program Counter
-             disSB.AppendLine("BIT  (X)");
+             disSB.Append(String.Format("BIT  (X){0}", Environment.NewLine));
             //tick += 7;
         }
 
@@ -1765,7 +1771,7 @@ namespace lh5801_Dis
             if (listFormat) { LineDump(P, opBytesP1[0x10]); } // dump bytes
 
             P += 1; // advance Program Counter
-            disSB.AppendLine("SBC  YL");
+            disSB.Append(String.Format("SBC  YL{0}", Environment.NewLine));
             //tick += 6;
         }
 
@@ -1779,7 +1785,7 @@ namespace lh5801_Dis
             if (listFormat) { LineDump(P, opBytesP1[0x11]); } // dump bytes
 
             P += 1; // advance Program Counter
-            disSB.AppendLine("SBC  (Y)");
+            disSB.Append(String.Format("SBC  (Y){0}", Environment.NewLine));
             // tick += 7;
         }
 
@@ -1793,7 +1799,7 @@ namespace lh5801_Dis
             if (listFormat) { LineDump(P, opBytesP1[0x12]); } // dump bytes
 
             P += 1; // advance Program Counter
-            disSB.AppendLine("ADC  YL");
+            disSB.Append(String.Format("ADC  YL{0}", Environment.NewLine));
             //tick += 6;
         }
 
@@ -1807,7 +1813,7 @@ namespace lh5801_Dis
             if (listFormat) { LineDump(P, opBytesP1[0x13]); } // dump bytes
 
             P += 1; // advance Program Counter
-            disSB.AppendLine("ADC  (Y)");
+            disSB.Append(String.Format("ADC  (Y){0}", Environment.NewLine));
         }
 
         /// <summary>
@@ -1820,7 +1826,7 @@ namespace lh5801_Dis
             if (listFormat) { LineDump(P, opBytesP1[0x14]); } // dump bytes
 
             P += 1; // advance Program Counter
-            disSB.AppendLine("LDA  YL");
+            disSB.Append(String.Format("LDA  YL{0}", Environment.NewLine));
             //tick += 5;
         }
 
@@ -1834,7 +1840,7 @@ namespace lh5801_Dis
             if (listFormat) { LineDump(P, opBytesP1[0x15]); } // dump bytes
 
             P += 1; // advance Program Counter
-            disSB.AppendLine("LDA  (Y)");
+            disSB.Append(String.Format("LDA  (Y){0}", Environment.NewLine));
             //tick += 6;
         }
 
@@ -1848,7 +1854,7 @@ namespace lh5801_Dis
             if (listFormat) { LineDump(P, opBytesP1[0x16]); } // dump bytes
 
             P += 1; // advance Program Counter
-            disSB.AppendLine("CPA  YL");
+            disSB.Append(String.Format("CPA  YL{0}", Environment.NewLine));
             //tick += 6;
         }
 
@@ -1862,7 +1868,7 @@ namespace lh5801_Dis
             if (listFormat) { LineDump(P, opBytesP1[0x17]); } // dump bytes
 
             P += 1; // advance Program Counter
-            disSB.AppendLine("CPA  (Y)");
+            disSB.Append(String.Format("CPA  (Y){0}", Environment.NewLine));
             //tick += 7;
         }
 
@@ -1876,7 +1882,7 @@ namespace lh5801_Dis
             if (listFormat) { LineDump(P, opBytesP1[0x18]); } // dump bytes
 
             P += 1; // advance Program Counter
-            disSB.AppendLine("STA  YH");
+            disSB.Append(String.Format("STA  YH{0}", Environment.NewLine));
             //tick += 5;
         }
 
@@ -1890,7 +1896,7 @@ namespace lh5801_Dis
             if (listFormat) { LineDump(P, opBytesP1[0x19]); } // dump bytes
 
             P += 1; // advance Program Counter
-            disSB.AppendLine("AND  (Y)");
+            disSB.Append(String.Format("AND  (Y){0}", Environment.NewLine));
             //tick += 7;
         }
 
@@ -1904,7 +1910,7 @@ namespace lh5801_Dis
             if (listFormat) { LineDump(P, opBytesP1[0x1A]); } // dump bytes
 
             P += 1; // advance Program Counter
-            disSB.AppendLine("STA  YL");
+            disSB.Append(String.Format("STA  YL{0}", Environment.NewLine));
             //tick += 5;
         }
 
@@ -1918,7 +1924,7 @@ namespace lh5801_Dis
             if (listFormat) { LineDump(P, opBytesP1[0x1B]); } // dump bytes
 
             P += 1; // advance Program Counter
-            disSB.AppendLine("ORA  (Y)");
+            disSB.Append(String.Format("ORA  (Y){0}", Environment.NewLine));
             //tick += 7;
         }
 
@@ -1932,7 +1938,7 @@ namespace lh5801_Dis
             if (listFormat) { LineDump(P, opBytesP1[0x1C]); } // dump bytes
 
             P += 1; // advance Program Counter
-            disSB.AppendLine("DCS  (Y)");
+            disSB.Append(String.Format("DCS  (Y){0}", Environment.NewLine));
             //tick += 13;
         }
 
@@ -1946,7 +1952,7 @@ namespace lh5801_Dis
             if (listFormat) { LineDump(P, opBytesP1[0x1D]); } // dump bytes
 
             P += 1; // advance Program Counter
-            disSB.AppendLine("EOR  (Y)");
+            disSB.Append(String.Format("EOR  (Y){0}", Environment.NewLine));
             //tick += 7;
         }
 
@@ -1960,7 +1966,7 @@ namespace lh5801_Dis
             if (listFormat) { LineDump(P, opBytesP1[0x1E]); } // dump bytes
 
             P += 1; // advance Program Counter
-            disSB.AppendLine("STA  (Y)");
+            disSB.Append(String.Format("STA  (Y){0}", Environment.NewLine));
             //tick += 6;
         }
 
@@ -1974,7 +1980,7 @@ namespace lh5801_Dis
             if (listFormat) { LineDump(P, opBytesP1[0x1F]); } // dump bytes
 
             P += 1; // advance Program Counter
-            disSB.AppendLine("BIT  (Y)");
+            disSB.Append(String.Format("BIT  (Y){0}", Environment.NewLine));
             //tick += 7;
         }
 
@@ -1992,7 +1998,7 @@ namespace lh5801_Dis
             if (listFormat) { LineDump(P, opBytesP1[0x20]); } // dump bytes
 
             P += 1; // advance Program Counter
-            disSB.AppendLine("SBC  UL");
+            disSB.Append(String.Format("SBC  UL{0}", Environment.NewLine));
             //tick += 6;
         }
 
@@ -2006,7 +2012,7 @@ namespace lh5801_Dis
             if (listFormat) { LineDump(P, opBytesP1[0x21]); } // dump bytes
 
             P += 1; // advance Program Counter
-            disSB.AppendLine("SBC  (U)");
+            disSB.Append(String.Format("SBC  (U){0}", Environment.NewLine));
             //tick += 7;
         }
 
@@ -2020,7 +2026,7 @@ namespace lh5801_Dis
             if (listFormat) { LineDump(P, opBytesP1[0x22]); } // dump b
 
             P += 1; // advance Program Counter
-            disSB.AppendLine("ADC  UL");
+            disSB.Append(String.Format("ADC  UL{0}", Environment.NewLine));
             //tick += 6;
         }
 
@@ -2034,7 +2040,7 @@ namespace lh5801_Dis
             if (listFormat) { LineDump(P, opBytesP1[0x23]); } // dump b
 
             P += 1; // advance Program Counter
-            disSB.AppendLine("ADC  (U)");
+            disSB.Append(String.Format("ADC  (U){0}", Environment.NewLine));
         }
 
         /// <summary>
@@ -2047,7 +2053,7 @@ namespace lh5801_Dis
             if (listFormat) { LineDump(P, opBytesP1[0x24]); } // dump
 
             P += 1; // advance Program Counter
-            disSB.AppendLine("LDA  UL");
+            disSB.Append(String.Format("LDA  UL{0}", Environment.NewLine));
             //tick += 5;
         }
 
@@ -2061,7 +2067,7 @@ namespace lh5801_Dis
             if (listFormat) { LineDump(P, opBytesP1[0x25]); } // dump b
 
             P += 1; // advance Program Counter
-            disSB.AppendLine("LDA  (U)");
+            disSB.Append(String.Format("LDA  (U){0}", Environment.NewLine));
             //tick += 6;
         }
 
@@ -2075,7 +2081,7 @@ namespace lh5801_Dis
             if (listFormat) { LineDump(P, opBytesP1[0x26]); } // dump b
 
             P += 1; // advance Program Counter
-            disSB.AppendLine("CPA  UL");
+            disSB.Append(String.Format("CPA  UL{0}", Environment.NewLine));
             //tick += 6;
         }
 
@@ -2089,7 +2095,7 @@ namespace lh5801_Dis
             if (listFormat) { LineDump(P, opBytesP1[0x27]); } // dump b
 
             P += 1; // advance Program Counter
-            disSB.AppendLine("CPA  (U)");
+            disSB.Append(String.Format("CPA  (U){0}", Environment.NewLine));
             //tick += 7;
         }
 
@@ -2103,7 +2109,7 @@ namespace lh5801_Dis
             if (listFormat) { LineDump(P, opBytesP1[0x28]); } // dump b
 
             P += 1; // advance Program Counter
-            disSB.AppendLine("STA  UH");
+            disSB.Append(String.Format("STA  UH{0}", Environment.NewLine));
             //tick += 5;
         }
 
@@ -2117,7 +2123,7 @@ namespace lh5801_Dis
             if (listFormat) { LineDump(P, opBytesP1[0x29]); } // dump b
 
             P += 1; // advance Program Counter
-            disSB.AppendLine("AND  (U)");
+            disSB.Append(String.Format("AND  (U){0}", Environment.NewLine));
             //tick += 7;
         }
 
@@ -2131,7 +2137,7 @@ namespace lh5801_Dis
             if (listFormat) { LineDump(P, opBytesP1[0x2A]); } // dump b
 
             P += 1; // advance Program Counter
-            disSB.AppendLine("STA  UL");
+            disSB.Append(String.Format("STA  UL{0}", Environment.NewLine));
             //tick += 5;
         }
 
@@ -2145,7 +2151,7 @@ namespace lh5801_Dis
             if (listFormat) { LineDump(P, opBytesP1[0x2B]); } // dump b
 
             P += 1; // advance Program Counter
-            disSB.AppendLine("ORA  (U)");
+            disSB.Append(String.Format("ORA  (U){0}", Environment.NewLine));
             //tick += 7;
         }
 
@@ -2159,7 +2165,7 @@ namespace lh5801_Dis
             if (listFormat) { LineDump(P, opBytesP1[0x2C]); } // dump b
 
             P += 1; // advance Program Counter
-            disSB.AppendLine("DCS  (U)");
+            disSB.Append(String.Format("DCS  (U){0}", Environment.NewLine));
             //tick += 13;
         }
 
@@ -2173,7 +2179,7 @@ namespace lh5801_Dis
             if (listFormat) { LineDump(P, opBytesP1[0x2D]); } // dump b
 
             P += 1; // advance Program Counter
-            disSB.AppendLine("EOR  (U)");
+            disSB.Append(String.Format("EOR  (U){0}", Environment.NewLine));
             //tick += 7;
         }
 
@@ -2187,7 +2193,7 @@ namespace lh5801_Dis
             if (listFormat) { LineDump(P, opBytesP1[0x2E]); } // hex dump
 
             P += 1; // advance Program Counter
-            disSB.AppendLine("STA  (U)");
+            disSB.Append(String.Format("STA  (U){0}", Environment.NewLine));
             //tick += 6;
         }
 
@@ -2201,7 +2207,7 @@ namespace lh5801_Dis
             if (listFormat) { LineDump(P, opBytesP1[0x2F]); } // hex dump
 
             P += 1; // advance Program Counter
-            disSB.AppendLine("BIT  (U)");
+            disSB.Append(String.Format("BIT  (U){0}", Environment.NewLine));
             //tick += 7;
         }
 
@@ -2219,7 +2225,7 @@ namespace lh5801_Dis
             if (listFormat) { LineDump(P, opBytesP1[0x30]); } // hex dump
 
             P += 1; // advance Program Counter
-            disSB.AppendLine("SBC  VL");
+            disSB.Append(String.Format("SBC  VL{0}", Environment.NewLine));
             //tick += 6;
         }
 
@@ -2233,7 +2239,7 @@ namespace lh5801_Dis
             if (listFormat) { LineDump(P, opBytesP1[0x31]); } // hex dump
 
             P += 1; // advance Program Counter
-            disSB.AppendLine("SBC  (V)");
+            disSB.Append(String.Format("SBC  (V){0}", Environment.NewLine));
             //tick += 7;
         }
 
@@ -2247,7 +2253,7 @@ namespace lh5801_Dis
             if (listFormat) { LineDump(P, opBytesP1[0x32]); } // hex dump
 
             P += 1; // advance Program Counter
-            disSB.AppendLine("ADC  VL");
+            disSB.Append(String.Format("ADC  VL{0}", Environment.NewLine));
             //tick += 6;
         }
 
@@ -2261,7 +2267,7 @@ namespace lh5801_Dis
             if (listFormat) { LineDump(P, opBytesP1[0x33]); } // hex dump
 
             P += 1; // advance Program Counter
-            disSB.AppendLine("ADC  (V)");
+            disSB.Append(String.Format("ADC  (V){0}", Environment.NewLine));
         }
 
         /// <summary>
@@ -2274,7 +2280,7 @@ namespace lh5801_Dis
             if (listFormat) { LineDump(P, opBytesP1[0x34]); } // hex dump
 
             P += 1; // advance Program Counter
-            disSB.AppendLine("LDA  VL");
+            disSB.Append(String.Format("LDA  VL{0}", Environment.NewLine));
             //tick += 5;
         }
 
@@ -2288,7 +2294,7 @@ namespace lh5801_Dis
             if (listFormat) { LineDump(P, opBytesP1[0x35]); } // hex dump
 
             P += 1; // advance Program Counter
-            disSB.AppendLine("LDA  (V)");
+            disSB.Append(String.Format("LDA  (V){0}", Environment.NewLine));
             //tick += 6;
         }
 
@@ -2302,7 +2308,7 @@ namespace lh5801_Dis
             if (listFormat) { LineDump(P, opBytesP1[0x36]); } // hex dump
 
             P += 1; // advance Program Counter
-            disSB.AppendLine("CPA  VL");
+            disSB.Append(String.Format("CPA  VL{0}", Environment.NewLine));
             //tick += 6;
         }
 
@@ -2317,7 +2323,7 @@ namespace lh5801_Dis
             if (listFormat) { LineDump(P, opBytesP1[0x37]); } // hex dump
 
             P += 1; // advance Program Counter
-            disSB.AppendLine("CPA  (V)");
+            disSB.Append(String.Format("CPA  (V){0}", Environment.NewLine));
             //tick += 7;
         }
 
@@ -2330,7 +2336,7 @@ namespace lh5801_Dis
             if (listFormat) { LineDump(P, opBytesP1[0x38]); } // hex dump
 
             P += 1; // advance Program Counter
-            disSB.AppendLine("NOP");
+            disSB.Append(String.Format("NOP{0}", Environment.NewLine));
             //tick += 5;
         }
 
@@ -2344,7 +2350,7 @@ namespace lh5801_Dis
             if (listFormat) { LineDump(P, opBytesP1[0x39]); } // hex dump
 
             P += 1; // advance Program Counter
-            disSB.AppendLine("AND  (V)");
+            disSB.Append(String.Format("AND  (V){0}", Environment.NewLine));
             //tick += 7;
         }
 
@@ -2358,7 +2364,7 @@ namespace lh5801_Dis
             if (listFormat) { LineDump(P, opBytesP1[0x3A]); } // hex dump
 
             P += 1; // advance Program Counter
-            disSB.AppendLine("STA  VL");
+            disSB.Append(String.Format("STA  VL{0}", Environment.NewLine));
             //tick += 5;
         }
 
@@ -2372,7 +2378,7 @@ namespace lh5801_Dis
             if (listFormat) { LineDump(P, opBytesP1[0x3B]); } // hex dump
 
             P += 1; // advance Program Counter
-            disSB.AppendLine("ORA  (V)");
+            disSB.Append(String.Format("ORA  (V){0}", Environment.NewLine));
             //tick += 7;
         }
 
@@ -2387,7 +2393,7 @@ namespace lh5801_Dis
             if (listFormat) { LineDump(P, opBytesP1[0x3C]); } // hex dump
 
             P += 1; // advance Program Counter
-            disSB.AppendLine("DCS  (V)");
+            disSB.Append(String.Format("DCS  (V){0}", Environment.NewLine));
             //tick += 13;
         }
 
@@ -2402,7 +2408,7 @@ namespace lh5801_Dis
             if (listFormat) { LineDump(P, opBytesP1[0x3D]); } // hex dump
 
             P += 1; // advance Program Counter
-            disSB.AppendLine("EOR  (V)");
+            disSB.Append(String.Format("EOR  (V){0}", Environment.NewLine));
             //tick += 7;
         }
 
@@ -2416,7 +2422,7 @@ namespace lh5801_Dis
             if (listFormat) { LineDump(P, opBytesP1[0x3E]); } // hex dump
 
             P += 1; // advance Program Counter
-            disSB.AppendLine("STA  (V)");
+            disSB.Append(String.Format("STA  (V){0}", Environment.NewLine));
             //tick += 6;
         }
 
@@ -2431,7 +2437,7 @@ namespace lh5801_Dis
             if (listFormat) { LineDump(P, opBytesP1[0x3F]); } // hex dump
 
             P += 1; // advance Program Counter
-            disSB.AppendLine("BIT  (V)");
+            disSB.Append(String.Format("BIT  (V){0}", Environment.NewLine));
             //tick += 7;
         }
 
@@ -2449,7 +2455,7 @@ namespace lh5801_Dis
             if (listFormat) { LineDump(P, opBytesP1[0x40]); } // dump bytes
 
             P += 1; // advance Program Counter
-            disSB.AppendLine("INC  XL");
+            disSB.Append(String.Format("INC  XL{0}", Environment.NewLine));
             //tick += 5;
         }
 
@@ -2463,7 +2469,7 @@ namespace lh5801_Dis
             if (listFormat) { LineDump(P, opBytesP1[0x41]); } // dump bytes
 
             P += 1; // advance Program Counter
-            disSB.AppendLine("SIN  X");
+            disSB.Append(String.Format("SIN  X{0}", Environment.NewLine));
             //tick += 6;
         }
 
@@ -2477,7 +2483,7 @@ namespace lh5801_Dis
             if (listFormat) { LineDump(P, opBytesP1[0x42]); } // dump bytes
 
             P += 1; // advance Program Counter
-            disSB.AppendLine("DEC  XL");
+            disSB.Append(String.Format("DEC  XL{0}", Environment.NewLine));
             //tick += 5;
         }
 
@@ -2491,7 +2497,7 @@ namespace lh5801_Dis
             if (listFormat) { LineDump(P, opBytesP1[0x43]); } // dump bytes
 
             P += 1; // advance Program Counter
-            disSB.AppendLine("SDE  X");
+            disSB.Append(String.Format("SDE  X{0}", Environment.NewLine));
             //tick += 6;
         }
 
@@ -2505,7 +2511,7 @@ namespace lh5801_Dis
             if (listFormat) { LineDump(P, opBytesP1[0x44]); } // dump bytes
 
             P += 1; // advance Program Counter
-            disSB.AppendLine("INC  X");
+            disSB.Append(String.Format("INC  X{0}", Environment.NewLine));
             //tick += 5;
         }
 
@@ -2519,7 +2525,7 @@ namespace lh5801_Dis
             if (listFormat) { LineDump(P, opBytesP1[0x45]); } // dump bytes
 
             P += 1; // advance Program Counter
-            disSB.AppendLine("LIN  X");
+            disSB.Append(String.Format("LIN  X{0}", Environment.NewLine));
             //tick += 6;
         }
 
@@ -2533,7 +2539,7 @@ namespace lh5801_Dis
             if (listFormat) { LineDump(P, opBytesP1[0x46]); } // dump bytes
 
             P += 1; // advance Program Counter
-            disSB.AppendLine("DEC  X");
+            disSB.Append(String.Format("DEC  X{0}", Environment.NewLine));
             //tick += 5;
         }
 
@@ -2547,7 +2553,7 @@ namespace lh5801_Dis
             if (listFormat) { LineDump(P, opBytesP1[0x47]); } // dump bytes
 
             P += 1; // advance Program Counter
-            disSB.AppendLine("LDE  X");
+            disSB.Append(String.Format("LDE  X{0}", Environment.NewLine));
             //tick += 6;
         }
 
@@ -2562,7 +2568,7 @@ namespace lh5801_Dis
 
             P += 1; // advance Program Counter
             byte value = GetByte(); // P += 1
-            disSB.AppendLine(String.Format("LDI  XH,${0:X2}", value));
+            disSB.Append(String.Format("LDI  XH,${0:X2}{1}", value, Environment.NewLine));
             //tick += 6;
         }
 
@@ -2577,7 +2583,7 @@ namespace lh5801_Dis
 
             P += 1; // advance Program Counter
             byte value = GetByte(); // P += 1
-            disSB.AppendLine(String.Format("ANI  (X),${0:X2}", value));
+            disSB.Append(String.Format("ANI  (X),${0:X2}{1}", value, Environment.NewLine));
             //tick += 13;
         }
 
@@ -2592,8 +2598,7 @@ namespace lh5801_Dis
 
             P += 1; // advance Program Counter
             byte value = GetByte(); // P +=1
-            disSB.Append("LDI  XL,$");
-            disSB.AppendLine(value.ToString("X2"));
+            disSB.Append(String.Format("LDI  XL,${0}{1}", value.ToString("X2"), Environment.NewLine));
             //tick += 6;
         }
 
@@ -2608,7 +2613,7 @@ namespace lh5801_Dis
 
             P += 1; // advance Program Counter
             byte value = GetByte();
-            disSB.AppendLine(String.Format("ORI  (X),${0:X2}", value));
+            disSB.Append(String.Format("ORI  (X),${0:X2}{1}", value, Environment.NewLine));
             //tick += 13;
         }
 
@@ -2623,7 +2628,7 @@ namespace lh5801_Dis
 
             P += 1; // advance Program Counter
             byte value = GetByte(); // P += 1
-            disSB.AppendLine(String.Format("CPI  XH,${0:X2}", value));
+            disSB.Append(String.Format("CPI  XH,${0:X2}{1}", value, Environment.NewLine));
             //tick += 7;
         }
 
@@ -2638,7 +2643,7 @@ namespace lh5801_Dis
 
             P += 1; // advance Program Counter
             byte value = this.GetByte(); // P += 1
-            disSB.AppendLine(String.Format("BII  (X),${0:X2}", value));
+            disSB.Append(String.Format("BII  (X),${0:X2}{1}", value, Environment.NewLine));
             //tick += 10;
         }
 
@@ -2653,7 +2658,7 @@ namespace lh5801_Dis
 
             P += 1; // advance Program Counter
             byte value = GetByte(); // P += 1
-            disSB.AppendLine(String.Format("CPI  XL,${0:X2}", value));
+            disSB.Append(String.Format("CPI  XL,${0:X2}{1}", value, Environment.NewLine));
             //tick += 7;
         }
 
@@ -2668,7 +2673,7 @@ namespace lh5801_Dis
 
             P += 1; // advance Program Counter
             byte value = GetByte(); // P += 1
-            disSB.AppendLine(String.Format("ADI  (X),${0:X2}", value));
+            disSB.Append(String.Format("ADI  (X),${0:X2}{1}", value, Environment.NewLine));
             //tick += 13;
         }
 
@@ -2686,8 +2691,7 @@ namespace lh5801_Dis
             if (listFormat) { LineDump(P, opBytesP1[0x50]); } // dump bytes
 
             P += 1; // advance Program Counter
-            disSB.AppendLine("INC  YL");
-            //tick += 5;
+            disSB.Append(String.Format("INC  YL{0}", Environment.NewLine));
         }
 
         /// <summary>
@@ -2700,7 +2704,7 @@ namespace lh5801_Dis
             if (listFormat) { LineDump(P, opBytesP1[0x51]); } // dump bytes
 
             P += 1; // advance Program Counter
-            disSB.AppendLine("SIN  Y");
+            disSB.Append(String.Format("SIN  Y{0}", Environment.NewLine));
             //tick += 6;
         }
 
@@ -2714,7 +2718,7 @@ namespace lh5801_Dis
             if (listFormat) { LineDump(P, opBytesP1[0x52]); } // dump bytes
 
             P += 1; // advance Program Counter
-            disSB.AppendLine("DEC  YL");
+            disSB.Append(String.Format("DEC  YL{0}", Environment.NewLine));
             tick += 5;
         }
 
@@ -2728,7 +2732,7 @@ namespace lh5801_Dis
             if (listFormat) { LineDump(P, opBytesP1[0x53]); } // dump bytes
 
             P += 1; // advance Program Counter
-            disSB.AppendLine("SDE  Y");
+            disSB.Append(String.Format("SDE  Y{0}", Environment.NewLine));
             //tick += 6;
         }
 
@@ -2742,7 +2746,7 @@ namespace lh5801_Dis
             if (listFormat) { LineDump(P, opBytesP1[0x54]); } // dump bytes
 
             P += 1; // advance Program Counter
-            disSB.AppendLine("INC  Y");
+            disSB.Append(String.Format("INC  Y{0}", Environment.NewLine));
             //tick += 5;
         }
 
@@ -2756,7 +2760,7 @@ namespace lh5801_Dis
             if (listFormat) { LineDump(P, opBytesP1[0x55]); } // dump bytes
 
             P += 1; // advance Program Counter
-            disSB.AppendLine("LIN  Y");
+            disSB.Append(String.Format("LIN  Y{0}", Environment.NewLine));
             //tick += 6;
         }
 
@@ -2770,7 +2774,7 @@ namespace lh5801_Dis
             if (listFormat) { LineDump(P, opBytesP1[0x56]); } // dump bytes
 
             P += 1; // advance Program Counter
-            disSB.AppendLine("DEC  Y");
+            disSB.Append(String.Format("DEC  Y{0}", Environment.NewLine));
             tick += 5;
         }
 
@@ -2784,7 +2788,7 @@ namespace lh5801_Dis
             if (listFormat) { LineDump(P, opBytesP1[0x57]); } // dump bytes
 
             P += 1; // advance Program Counter
-            disSB.AppendLine("LDE  Y");
+            disSB.Append(String.Format("LDE  Y{0}", Environment.NewLine));
             //tick += 6;
         }
 
@@ -2799,7 +2803,7 @@ namespace lh5801_Dis
 
             P += 1; // advance Program Counter
             byte value = GetByte(); // P += 1
-            disSB.AppendLine(String.Format("LDI  YH,${0:X2}", value));
+            disSB.Append(String.Format("LDI  YH,${0:X2}{1}", value, Environment.NewLine));
             //tick += 6;
         }
 
@@ -2814,7 +2818,7 @@ namespace lh5801_Dis
 
             P += 1; // advance Program Counter
             byte value = GetByte(); // P += 1
-            disSB.AppendLine(String.Format("ANI  (Y),${0:X2}", value));
+            disSB.Append(String.Format("ANI  (Y),${0:X2}{1}", value, Environment.NewLine));
             //tick += 13;
         }
 
@@ -2829,7 +2833,7 @@ namespace lh5801_Dis
 
             P += 1; // advance Program Counter
             byte value = GetByte(); // P += 1
-            disSB.AppendLine(String.Format("LDI  YL,${0:X2}", value));
+            disSB.Append(String.Format("LDI  YL,${0:X2}{1}", value, Environment.NewLine));
             //tick += 6;
         }
 
@@ -2844,7 +2848,7 @@ namespace lh5801_Dis
 
             P += 1; // advance Program Counter
             byte value = GetByte();
-            disSB.AppendLine(String.Format("ORI  (Y),${0:X2}", value));
+            disSB.Append(String.Format("ORI  (Y),${0:X2}{1}", value, Environment.NewLine));
             //tick += 13;
         }
 
@@ -2859,7 +2863,7 @@ namespace lh5801_Dis
 
             P += 1; // advance Program Counter
             byte value = GetByte(); // P += 1
-            disSB.AppendLine(String.Format("CPI  YH,${0:X2}", value));
+            disSB.Append(String.Format("CPI  YH,${0:X2}{1}", value, Environment.NewLine));
             //tick += 7;
         }
 
@@ -2874,7 +2878,7 @@ namespace lh5801_Dis
 
             P += 1; // advance Program Counter
             byte value = this.GetByte(); // P += 1
-            disSB.AppendLine(String.Format("BII  (Y),${0:X2}", value));
+            disSB.Append(String.Format("BII  (Y),${0:X2}{1}", value, Environment.NewLine));
             //tick += 10;
         }
 
@@ -2889,7 +2893,7 @@ namespace lh5801_Dis
 
             P += 1; // advance Program Counter
             byte value = GetByte(); // P += 1
-            disSB.AppendLine(String.Format("CPI  YL,${0:X2}", value));
+            disSB.Append(String.Format("CPI  YL,${0:X2}{1}", value, Environment.NewLine));
             //tick += 7;
         }
 
@@ -2904,7 +2908,7 @@ namespace lh5801_Dis
 
             P += 1; // advance Program Counter
             byte value = GetByte(); // P += 1
-            disSB.AppendLine(String.Format("ADI  (Y),${0:X2}", value));
+            disSB.Append(String.Format("ADI  (Y),${0:X2}{1}", value, Environment.NewLine));
             //tick += 13;
         }
 
@@ -2922,7 +2926,7 @@ namespace lh5801_Dis
             if (listFormat) { LineDump(P, opBytesP1[0x60]); } // dump bytes
 
             P += 1; // advance Program Counter
-            disSB.AppendLine("INC  UL");
+            disSB.Append(String.Format("INC  UL{0}", Environment.NewLine));
             //tick += 5;
         }
 
@@ -2936,7 +2940,7 @@ namespace lh5801_Dis
             if (listFormat) { LineDump(P, opBytesP1[0x61]); } // dump bytes
 
             P += 1; // advance Program Counter
-            disSB.AppendLine("SIN  U");
+            disSB.Append(String.Format("SIN  U{0}", Environment.NewLine));
             //tick += 6;
         }
 
@@ -2950,7 +2954,7 @@ namespace lh5801_Dis
             if (listFormat) { LineDump(P, opBytesP1[0x62]); } // dump bytes
 
             P += 1; // advance Program Counter
-            disSB.AppendLine("DEC  UL");
+            disSB.Append(String.Format("DEC  UL{0}", Environment.NewLine));
             //tick += 5;
         }
 
@@ -2964,7 +2968,7 @@ namespace lh5801_Dis
             if (listFormat) { LineDump(P, opBytesP1[0x63]); } // dump bytes
 
             P += 1; // advance Program Counter
-            disSB.AppendLine("SDE  U");
+            disSB.Append(String.Format("SDE  U{0}", Environment.NewLine));
             //tick += 6;
         }
 
@@ -2978,7 +2982,7 @@ namespace lh5801_Dis
             if (listFormat) { LineDump(P, opBytesP1[0x64]); } // dump bytes
 
             P += 1; // advance Program Counter
-            disSB.AppendLine("INC  U");
+            disSB.Append(String.Format("INC  U{0}", Environment.NewLine));
             //tick += 5;
         }
 
@@ -2992,7 +2996,7 @@ namespace lh5801_Dis
             if (listFormat) { LineDump(P, opBytesP1[0x65]); } // dump bytes
 
             P += 1; // advance Program Counter
-            disSB.AppendLine("LIN  U");
+            disSB.Append(String.Format("LIN  U{0}", Environment.NewLine));
             //tick += 6;
         }
 
@@ -3006,7 +3010,7 @@ namespace lh5801_Dis
             if (listFormat) { LineDump(P, opBytesP1[0x66]); } // dump bytes
 
             P += 1; // advance Program Counter
-            disSB.AppendLine("DEC  U");
+            disSB.Append(String.Format("DEC  U{0}", Environment.NewLine));
             //tick += 5;
         }
 
@@ -3020,7 +3024,7 @@ namespace lh5801_Dis
             if (listFormat) { LineDump(P, opBytesP1[0x67]); } // dump bytes
 
             P  += 1; // advance Program Counter
-            disSB.AppendLine("LDE  U");
+            disSB.Append(String.Format("LDE  U{0}", Environment.NewLine));
             //tick += 6;
         }
 
@@ -3035,7 +3039,7 @@ namespace lh5801_Dis
 
             P += 1; // advance Program Counter
             byte value = GetByte(); // P += 1
-            disSB.AppendLine(String.Format("LDI  UH,${0:X2}", value));
+            disSB.Append(String.Format("LDI  UH,${0:X2}{1}", value, Environment.NewLine));
             //tick += 6;
         }
 
@@ -3050,7 +3054,7 @@ namespace lh5801_Dis
 
             P += 1; // advance Program Counter
             byte value = GetByte(); // P += 1
-            disSB.AppendLine(String.Format("ANI  (U),${0:X2}", value));
+            disSB.Append(String.Format("ANI  (U),${0:X2}{1}", value, Environment.NewLine));
             //tick += 13;
         }
 
@@ -3065,7 +3069,7 @@ namespace lh5801_Dis
 
             P += 1; // advance Program Counter
             byte value = GetByte(); // P += 1
-            disSB.AppendLine(String.Format("LDI  UL,${0:X2}", value));
+            disSB.Append(String.Format("LDI  UL,${0:X2}{1}", value, Environment.NewLine));
             tick += 6;
         }
 
@@ -3080,7 +3084,7 @@ namespace lh5801_Dis
 
             P += 1; // advance Program Counter
             byte value = GetByte();
-            disSB.AppendLine(String.Format("ORI  (U),${0:X2}", value));
+            disSB.Append(String.Format("ORI  (U),${0:X2}{1}", value, Environment.NewLine));
             //tick += 13;
         }
 
@@ -3095,7 +3099,7 @@ namespace lh5801_Dis
 
             P += 1; // advance Program Counter
             byte value = GetByte(); // P += 1
-            disSB.AppendLine(String.Format("CPI  UH,${0:X2}", value));
+            disSB.Append(String.Format("CPI  UH,${0:X2}{1}", value, Environment.NewLine));
             //tick += 7;
         }
 
@@ -3110,7 +3114,7 @@ namespace lh5801_Dis
 
             P += 1; // advance Program Counter
             byte value = GetByte(); // P += 1
-            disSB.AppendLine(String.Format("BII  (U),${0:X2}", value));
+            disSB.Append(String.Format("BII  (U),${0:X2}{1}", value, Environment.NewLine));
             //tick += 10;
         }
 
@@ -3125,7 +3129,7 @@ namespace lh5801_Dis
 
             P += 1; // advance Program Counter
             byte value = GetByte(); // P += 1
-            disSB.AppendLine(String.Format("CPI  UL,${0:X2}", value));
+            disSB.Append(String.Format("CPI  UL,${0:X2}{1}", value, Environment.NewLine));
             //tick += 7;
         }
 
@@ -3140,7 +3144,7 @@ namespace lh5801_Dis
 
             P += 1; // advance Program Counter
             byte value = GetByte(); // P += 1
-            disSB.AppendLine(String.Format("ADI  (U),${0:X2}", value));
+            disSB.Append(String.Format("ADI  (U),${0:X2}{1}", value, Environment.NewLine));
             //tick += 13;
         }
 
@@ -3158,7 +3162,7 @@ namespace lh5801_Dis
             if (listFormat) { LineDump(P, opBytesP1[0x70]); } // dump bytes
 
             P += 1; // advance Program Counter
-            disSB.AppendLine("INC  VL");
+            disSB.Append(String.Format("INC  VL{0}", Environment.NewLine));
             //tick += 5;
         }
 
@@ -3172,7 +3176,7 @@ namespace lh5801_Dis
             if (listFormat) { LineDump(P, opBytesP1[0x71]); } // dump bytes
 
             P += 1; // advance Program Counter
-            disSB.AppendLine("SIN  V");
+            disSB.Append(String.Format("SIN  V{0}", Environment.NewLine));
             //tick += 6;
         }
 
@@ -3186,7 +3190,7 @@ namespace lh5801_Dis
             if (listFormat) { LineDump(P, opBytesP1[0x72]); } // dump bytes
 
             P += 1; // advance Program Counter
-            disSB.AppendLine("DEC  VL");
+            disSB.Append(String.Format("DEC  VL{0}", Environment.NewLine));
             //tick += 5;
         }
 
@@ -3200,7 +3204,7 @@ namespace lh5801_Dis
             if (listFormat) { LineDump(P, opBytesP1[0x73]); } // dump bytes
 
             P += 1; // advance Program Counter
-            disSB.AppendLine("SDE  V");
+            disSB.Append(String.Format("SDE  V{0}", Environment.NewLine));
             //tick += 6;
         }
 
@@ -3214,7 +3218,7 @@ namespace lh5801_Dis
             if (listFormat) { LineDump(P, opBytesP1[0x74]); } // dump bytes
 
             P += 1; // advance Program Counter
-            disSB.AppendLine("INC  V");
+            disSB.Append(String.Format("INC  V{0}", Environment.NewLine));
             //tick += 5;
         }
 
@@ -3228,7 +3232,7 @@ namespace lh5801_Dis
             if (listFormat) { LineDump(P, opBytesP1[0x75]); } // dump bytes
 
             P += 1; // advance Program Counter
-            disSB.AppendLine("LIN  V");
+            disSB.Append(String.Format("LIN  V{0}", Environment.NewLine));
             //tick += 6;
         }
 
@@ -3242,7 +3246,7 @@ namespace lh5801_Dis
             if (listFormat) { LineDump(P, opBytesP1[0x76]); } // dump bytes
 
             P += 1; // advance Program Counter
-            disSB.AppendLine("DEC  V");
+            disSB.Append(String.Format("DEC  V{0}", Environment.NewLine));
             //tick += 5;
         }
 
@@ -3257,7 +3261,7 @@ namespace lh5801_Dis
             if (listFormat) { LineDump(P, opBytesP1[0x77]); } // dump bytes
 
             P += 1; // advance Program Counter
-            disSB.AppendLine("LDE  V");
+            disSB.Append(String.Format("LDE  V{0}", Environment.NewLine));
             //tick += 6;
         }
 
@@ -3273,7 +3277,7 @@ namespace lh5801_Dis
 
             P += 1; // advance Program Counter
             byte value = GetByte(); // P += 1
-            disSB.AppendLine(String.Format("LDI  VH,${0:X2}", value));
+            disSB.Append(String.Format("LDI  VH,${0:X2}{1}", value, Environment.NewLine));
             //tick += 6;
         }
 
@@ -3289,7 +3293,7 @@ namespace lh5801_Dis
 
             P += 1; // advance Program Counter
             byte value = GetByte(); // P += 1
-            disSB.AppendLine(String.Format("ANI  (V),${0:X2}", value));
+            disSB.Append(String.Format("ANI  (V),${0:X2}{1}", value, Environment.NewLine));
             //tick += 13;
         }
 
@@ -3305,7 +3309,7 @@ namespace lh5801_Dis
 
             P += 1; // advance Program Counter
             byte value = GetByte(); // P += 1
-            disSB.AppendLine(String.Format("LDI  VL,${0:X2}", value));
+            disSB.Append(String.Format("LDI  VL,${0:X2}{1}", value, Environment.NewLine));
             //tick += 6;
         }
 
@@ -3321,7 +3325,7 @@ namespace lh5801_Dis
 
             P += 1; // advance Program Counter
             byte value = GetByte();
-            disSB.AppendLine(String.Format("ORI  (V),${0:X2}", value));
+            disSB.Append(String.Format("ORI  (V),${0:X2}{1}", value, Environment.NewLine));
             //tick += 13;
         }
 
@@ -3337,7 +3341,7 @@ namespace lh5801_Dis
 
             P += 1; // advance Program Counter
             byte value = GetByte(); // P += 1
-            disSB.AppendLine(String.Format("CPI  VH,${0:X2}", value));
+            disSB.Append(String.Format("CPI  VH,${0:X2}{1}", value, Environment.NewLine));
             //tick += 7;
         }
 
@@ -3353,7 +3357,7 @@ namespace lh5801_Dis
 
             P += 1; // advance Program Counter
             byte value = this.GetByte(); // P += 1
-            disSB.AppendLine(String.Format("BII  (V),${0:X2}", value));
+            disSB.Append(String.Format("BII  (V),${0:X2}{1}", value, Environment.NewLine));
             //tick += 10;
         }
 
@@ -3369,7 +3373,7 @@ namespace lh5801_Dis
 
             P += 1; // advance Program Counter
             byte value = GetByte(); // P += 1
-            disSB.AppendLine(String.Format("CPI  VL,${0:X2}", value));
+            disSB.Append(String.Format("CPI  VL,${0:X2}{1}", value, Environment.NewLine));
             //tick += 7;
         }
 
@@ -3385,7 +3389,7 @@ namespace lh5801_Dis
 
             P += 1; // advance Program Counter
             byte value = GetByte(); // P += 1
-            disSB.AppendLine(String.Format("ADI  (V),${0:X2}", value));
+            disSB.Append(String.Format("ADI  (V),${0:X2}{1}", value, Environment.NewLine));
             //tick += 13;
         }
 
@@ -3403,7 +3407,7 @@ namespace lh5801_Dis
             if (listFormat) { LineDump(P, opBytesP1[0x80]); } // dump bytes
 
             P += 1; // advance Program Counter
-            disSB.AppendLine("SBC  XH");
+            disSB.Append(String.Format("SBC  XH{0}", Environment.NewLine));
             //tick += 6;
         }
 
@@ -3419,7 +3423,7 @@ namespace lh5801_Dis
             P += 1; // advance Program Counter
             byte value = GetByte(); // P += 1
             ushort address = (ushort)(P + value);
-            disSB.AppendLine(String.Format("BCR+ {0}", GetAddOrLabel(address)));
+            disSB.Append(String.Format("BCR+ {0}{1}", GetAddOrLabel(address), Environment.NewLine));
             //tick += 8;
         }
 
@@ -3433,7 +3437,7 @@ namespace lh5801_Dis
             if (listFormat) { LineDump(P, opBytesP1[0x82]); } // dump bytes
 
             P += 1; // advance Program Counter
-            disSB.AppendLine("ADC  XH");
+            disSB.Append(String.Format("ADC  XH{0}", Environment.NewLine));
             //tick += 6;
         }
 
@@ -3449,7 +3453,7 @@ namespace lh5801_Dis
             P += 1; // advance Program Counter
             byte value = GetByte(); // P += 1
             ushort address = (ushort)(P + value);
-            disSB.AppendLine(String.Format("BCS+ {0}", GetAddOrLabel(address)));
+            disSB.Append(String.Format("BCS+ {0}{1}", GetAddOrLabel(address), Environment.NewLine));
             //tick += 8; 
         }
 
@@ -3463,7 +3467,7 @@ namespace lh5801_Dis
             if (listFormat) { LineDump(P, opBytesP1[0x84]); } // dump bytes
 
             P += 1; // advance Program Counter
-            disSB.AppendLine("LDA  XH");
+            disSB.Append(String.Format("LDA  XH{0}", Environment.NewLine));
             //tick += 5;
         }
 
@@ -3479,7 +3483,7 @@ namespace lh5801_Dis
             P += 1; // advance Program Counter
             byte value = GetByte(); // P += 1
             ushort address = (ushort)(P + value);
-            disSB.AppendLine(String.Format("BHR+ {0}", GetAddOrLabel(address)));
+            disSB.Append(String.Format("BHR+ {0}{1}", GetAddOrLabel(address), Environment.NewLine));
             //tick += 8;
         }
 
@@ -3493,7 +3497,7 @@ namespace lh5801_Dis
             if (listFormat) { LineDump(P, opBytesP1[0x86]); } // dump bytes
 
             P += 1; // advance Program Counter
-            disSB.AppendLine("CPA  XH");
+            disSB.Append(String.Format("CPA  XH{0}", Environment.NewLine));
             //tick += 6;
         }
 
@@ -3509,7 +3513,7 @@ namespace lh5801_Dis
             P += 1; // advance Program Counter
             byte value = GetByte(); // P += 1
             ushort address = (ushort)(P + value);
-            disSB.AppendLine(String.Format("BHS+ {0}", GetAddOrLabel(address)));
+            disSB.Append(String.Format("BHS+ {0}{1}", GetAddOrLabel(address), Environment.NewLine));
             //tick += 8;
         }
 
@@ -3525,7 +3529,7 @@ namespace lh5801_Dis
             P += 1; // advance Program Counter
             byte value = GetByte(); // P += 1
             ushort address = (ushort)(P - value);
-            disSB.AppendLine(String.Format("LOP UL,{0}", GetAddOrLabel(address)));
+            disSB.Append(String.Format("LOP UL,{0}{1}", GetAddOrLabel(address), Environment.NewLine));
             //tick += 8;
         }
 
@@ -3541,7 +3545,7 @@ namespace lh5801_Dis
             P += 1; // advance Program Counter
             byte value = GetByte(); // P += 1
             ushort address = (ushort)(P + value);
-            disSB.AppendLine(String.Format("BZR+ {0}", GetAddOrLabel(address)));
+            disSB.Append(String.Format("BZR+ {0}{1}", GetAddOrLabel(address), Environment.NewLine));
             //tick += 8;
         }
 
@@ -3555,7 +3559,7 @@ namespace lh5801_Dis
             if (listFormat) { LineDump(P, opBytesP1[0x8A]); } // dump bytes
 
             P += 1;  // advance Program Counter
-            disSB.AppendLine("RTI");
+            disSB.Append(String.Format("RTI{0}", Environment.NewLine));
             //tick += 14;
         }
 
@@ -3571,7 +3575,7 @@ namespace lh5801_Dis
             P += 1; // advance Program Counter
             byte value = GetByte(); // P += 1
             ushort address = (ushort)(P + value);
-            disSB.AppendLine(String.Format("BZS+ {0}", GetAddOrLabel(address)));
+            disSB.Append(String.Format("BZS+ {0}{1}", GetAddOrLabel(address), Environment.NewLine));
             //tick += 8;
         }
 
@@ -3585,7 +3589,7 @@ namespace lh5801_Dis
             if (listFormat) { LineDump(P, opBytesP1[0x8C]); } // dump bytes
 
             P += 1; // advance Program Counter
-            disSB.AppendLine("DCA  (X)");
+            disSB.Append(String.Format("DCA  (X){0}", Environment.NewLine));
             //tick += 15;
         }
 
@@ -3601,7 +3605,7 @@ namespace lh5801_Dis
             P += 1; // advance Program Counter
             byte value = GetByte(); // P += 1
             ushort address = (ushort)(P + value);
-            disSB.AppendLine(String.Format("BVR+ {0}", GetAddOrLabel(address)));
+            disSB.Append(String.Format("BVR+ {0}{1}", GetAddOrLabel(address), Environment.NewLine));
             //tick += 8;
         }
 
@@ -3617,7 +3621,7 @@ namespace lh5801_Dis
             P += 1; // advance Program Counter
             byte value = GetByte(); // P += 1
             ushort address = (ushort)(P + value);
-            disSB.AppendLine(String.Format("BCH+ {0}", GetAddOrLabel(address)));
+            disSB.Append(String.Format("BCH+ {0}{1}", GetAddOrLabel(address), Environment.NewLine));
             //tick += 8;
         }
 
@@ -3633,7 +3637,7 @@ namespace lh5801_Dis
             P += 1; // advance Program Counter
             byte value = GetByte(); // P += 1
             ushort address = (ushort)(P + value);
-            disSB.AppendLine(String.Format("BVS+ {0}", GetAddOrLabel(address)));
+            disSB.Append(String.Format("BVS+ {0}{1}", GetAddOrLabel(address), Environment.NewLine));
             //tick += 8;
         }
 
@@ -3651,7 +3655,7 @@ namespace lh5801_Dis
             if (listFormat) { LineDump(P, opBytesP1[0x90]); } // dump bytes
 
             P += 1; // advance Program Counter
-            disSB.AppendLine("SBC  YH");
+            disSB.Append(String.Format("SBC  YH{0}", Environment.NewLine));
             //tick += 6;
         }
 
@@ -3667,7 +3671,7 @@ namespace lh5801_Dis
             P += 1; // advance Program Counter
             byte value = GetByte(); // P += 1
             ushort address = (ushort)(P - value);
-            disSB.AppendLine(String.Format("BCR- {0}", GetAddOrLabel(address)));
+            disSB.Append(String.Format("BCR- {0}{1}", GetAddOrLabel(address), Environment.NewLine));
             //tick += 8; // three extra cycles to take back branch
         }
 
@@ -3681,7 +3685,7 @@ namespace lh5801_Dis
             if (listFormat) { LineDump(P, opBytesP1[0x92]); } // dump bytes
 
             P += 1; // advance Program Counter
-            disSB.AppendLine("ADC  YH");
+            disSB.Append(String.Format("ADC  YH{0}", Environment.NewLine));
             // tick += 6;
         }
 
@@ -3697,7 +3701,7 @@ namespace lh5801_Dis
             P += 1; // advance Program Counter
             byte value = GetByte(); // P += 1
             ushort address = (ushort)(P - value);
-            disSB.AppendLine(String.Format("BCS- {0}", GetAddOrLabel(address)));
+            disSB.Append(String.Format("BCS- {0}{1}", GetAddOrLabel(address), Environment.NewLine));
             //tick += 8;
         }
 
@@ -3711,7 +3715,7 @@ namespace lh5801_Dis
             if (listFormat) { LineDump(P, opBytesP1[0x94]); } // dump bytes
 
             P += 1; // advance Program Counter
-            disSB.AppendLine("LDA  YH");
+            disSB.Append(String.Format("LDA  YH{0}", Environment.NewLine));
             //tick += 5;
         }
 
@@ -3727,7 +3731,7 @@ namespace lh5801_Dis
             P += 1; // advance Program Counter
             byte value = GetByte(); // P += 1
             ushort address = (ushort)(P - value);
-            disSB.AppendLine(String.Format("BHR- {0}", GetAddOrLabel(address)));
+            disSB.Append(String.Format("BHR- {0}{1}", GetAddOrLabel(address), Environment.NewLine));
             //tick += 8;
         }
 
@@ -3741,7 +3745,7 @@ namespace lh5801_Dis
             if (listFormat) { LineDump(P, opBytesP1[0x96]); } // dump bytes
 
             P += 1; // advance Program Counter
-            disSB.AppendLine("CPA  YH");
+            disSB.Append(String.Format("CPA  YH{0}", Environment.NewLine));
             //tick += 6;
         }
 
@@ -3757,7 +3761,7 @@ namespace lh5801_Dis
             P += 1; // advance Program Counter
             byte value = GetByte(); // P += 1
             ushort address = (ushort)(P - value);
-            disSB.AppendLine(String.Format("BHS- {0}", GetAddOrLabel(address)));
+            disSB.Append(String.Format("BHS- {0}{1}", GetAddOrLabel(address), Environment.NewLine));
             //tick += 8;
         }
 
@@ -3773,7 +3777,7 @@ namespace lh5801_Dis
             P += 1; // advance Program Counter
             byte value = GetByte(); // P += 1
             ushort address = (ushort)(P - value);
-            disSB.AppendLine(String.Format("BZR- {0}", GetAddOrLabel(address)));
+            disSB.Append(String.Format("BZR- {0}{1}", GetAddOrLabel(address), Environment.NewLine));
             //tick += 8;
         }
 
@@ -3787,7 +3791,7 @@ namespace lh5801_Dis
             if (listFormat) { LineDump(P, opBytesP1[0x9A]); } // dump bytes
 
             P += 1; // advance Program Counter
-            disSB.AppendLine("RTN");
+            disSB.Append(String.Format("RTN{0}", Environment.NewLine));
             //tick += 11;
         }
 
@@ -3803,7 +3807,7 @@ namespace lh5801_Dis
             P += 1; // advance Program Counter
             byte value = GetByte(); // P += 1
             ushort address = (ushort)(P - value);
-            disSB.AppendLine(String.Format("BZS- {0}", GetAddOrLabel(address)));
+            disSB.Append(String.Format("BZS- {0}{1}", GetAddOrLabel(address), Environment.NewLine));
             //tick += 8;
         }
 
@@ -3817,7 +3821,7 @@ namespace lh5801_Dis
             if (listFormat) { LineDump(P, opBytesP1[0x9C]); } // dump bytes
 
             P += 1; // advance Program Counter
-            disSB.AppendLine("DCA  (Y)");
+            disSB.Append(String.Format("DCA  (Y){0}", Environment.NewLine));
             //tick += 15;
         }
 
@@ -3833,7 +3837,7 @@ namespace lh5801_Dis
             P += 1; // advance Program Counter
             byte value = GetByte(); // P += 1
             ushort address = (ushort)(P - value);
-            disSB.AppendLine(String.Format("BVR- {0}", GetAddOrLabel(address)));
+            disSB.Append(String.Format("BVR- {0}{1}", GetAddOrLabel(address), Environment.NewLine));
            // tick += 8;
         }
 
@@ -3849,7 +3853,7 @@ namespace lh5801_Dis
             P += 1; // advance Program Counter
             byte value = GetByte(); // P += 1
             ushort address = (ushort)(P - value);
-            disSB.AppendLine(String.Format("BCH- {0}", GetAddOrLabel(address)));
+            disSB.Append(String.Format("BCH- {0}{1}", GetAddOrLabel(address), Environment.NewLine));
            //tick += 9;
         }
 
@@ -3865,7 +3869,7 @@ namespace lh5801_Dis
             P += 1; // advance Program Counter
             byte value = GetByte(); // P += 1
             ushort address = (ushort)(P - value);
-            disSB.AppendLine(String.Format("BVS- {0}", GetAddOrLabel(address)));
+            disSB.Append(String.Format("BVS- {0}{1}", GetAddOrLabel(address), Environment.NewLine));
             //tick += 8;
         }
 
@@ -3883,7 +3887,7 @@ namespace lh5801_Dis
             if (listFormat) { LineDump(P, opBytesP1[0xA0]); } // dump bytes
 
             P += 1; // advance Program Counter
-            disSB.AppendLine("SBC  UH");
+            disSB.Append(String.Format("SBC  UH{0}", Environment.NewLine));
             //tick += 6;
         }
 
@@ -3898,7 +3902,7 @@ namespace lh5801_Dis
 
             P += 1;                       // advance Program Counter
             ushort address = GetWord();   // P += 2
-            disSB.AppendLine(String.Format("SBC  ({0})", GetAddOrLabel(address)));
+            disSB.Append(String.Format("SBC  ({0}){1}", GetAddOrLabel(address), Environment.NewLine));
             //tick += 13;
         }
 
@@ -3912,7 +3916,7 @@ namespace lh5801_Dis
             if (listFormat) { LineDump(P, opBytesP1[0xA2]); } // dump bytes
 
             P += 1; // advance Program Counter
-            disSB.AppendLine("ADC  UH");
+            disSB.Append(String.Format("ADC  UH{0}", Environment.NewLine));
             //tick += 6;
         }
 
@@ -3926,7 +3930,7 @@ namespace lh5801_Dis
 
             P += 1; // advance Program Counter
             ushort address = GetWord(); // P += 2
-            disSB.AppendLine(String.Format("ADC  ({0})", GetAddOrLabel(address)));
+            disSB.Append(String.Format("ADC  ({0}){1}", GetAddOrLabel(address), Environment.NewLine));
             //tick += 13;
         }
 
@@ -3940,7 +3944,7 @@ namespace lh5801_Dis
             if (listFormat) { LineDump(P, opBytesP1[0xA0]); } // dump bytes
 
             P += 1; // advance Program Counter
-            disSB.AppendLine("LDA  UH");
+            disSB.Append(String.Format("LDA  UH{0}", Environment.NewLine));
             //tick += 5;
         }
 
@@ -3955,7 +3959,7 @@ namespace lh5801_Dis
 
             P += 1; // advance Program Counter
             ushort address = GetWord(); // P += 2
-            disSB.AppendLine(String.Format("LDA  ({0})", GetAddOrLabel(address)));
+            disSB.Append(String.Format("LDA  ({0}){1}", GetAddOrLabel(address), Environment.NewLine));
             //tick += 12;
         }
 
@@ -3969,7 +3973,7 @@ namespace lh5801_Dis
             if (listFormat) { LineDump(P, opBytesP1[0xA6]); } // dump bytes
 
             P += 1; // advance Program Counter
-            disSB.AppendLine("CPA  UH");
+            disSB.Append(String.Format("CPA  UH{0}", Environment.NewLine));
             //tick += 6;
         }
 
@@ -3984,7 +3988,7 @@ namespace lh5801_Dis
 
             P += 1; // advance Program Counter
             ushort address = GetWord(); // P += 2
-            disSB.AppendLine(String.Format("CPA  ({0})", GetAddOrLabel(address)));
+            disSB.Append(String.Format("CPA  ({0}){1}", GetAddOrLabel(address), Environment.NewLine));
             //tick += 13;
         }
 
@@ -3998,7 +4002,7 @@ namespace lh5801_Dis
             if (listFormat) { LineDump(P, opBytesP1[0xA8]); } // dump bytes
 
             P += 1; // advance Program Counter
-            disSB.AppendLine("SPV");
+            disSB.Append(String.Format("SPV{0}", Environment.NewLine));
             //tick += 4;
         }
 
@@ -4013,7 +4017,7 @@ namespace lh5801_Dis
 
             P += 1; // advance Program Counter
             ushort address = GetWord(); // P += 2
-            disSB.AppendLine(String.Format("AND  ({0})", GetAddOrLabel(address)));
+            disSB.Append(String.Format("AND  ({0}){1}", GetAddOrLabel(address), Environment.NewLine));
             //tick += 13;
         }
 
@@ -4028,7 +4032,7 @@ namespace lh5801_Dis
 
             P += 1; // advance Program Counter
             ushort address = GetWord(); // P += 2
-            disSB.AppendLine(String.Format("LDI  S,({0})", GetAddOrLabel(address)));
+            disSB.Append(String.Format("LDI  S,({0}){1}", GetAddOrLabel(address), Environment.NewLine));
             //tick += 12;
         }
 
@@ -4043,7 +4047,7 @@ namespace lh5801_Dis
 
             P += 1; // advance Program Counter
             ushort address = GetWord(); // P += 2
-            disSB.AppendLine(String.Format("ORA  ({0})", GetAddOrLabel(address)));
+            disSB.Append(String.Format("ORA  ({0}){1}", GetAddOrLabel(address), Environment.NewLine));
             //tick += 13;
         }
 
@@ -4057,7 +4061,7 @@ namespace lh5801_Dis
             if (listFormat) { LineDump(P, opBytesP1[0xAC]); } // dump bytes
 
             P += 1; // advance Program Counter
-            disSB.AppendLine("DCA  (U)");
+            disSB.Append(String.Format("DCA  (U){0}", Environment.NewLine));
             //tick += 15;
         }
 
@@ -4072,7 +4076,7 @@ namespace lh5801_Dis
 
             P += 1; // advance Program Counter
             ushort address = GetWord(); // P += 2;
-            disSB.AppendLine(String.Format("EOR  ({0})", GetAddOrLabel(address)));
+            disSB.Append(String.Format("EOR  ({0}){1}", GetAddOrLabel(address), Environment.NewLine));
             //tick += 13;
         }
 
@@ -4087,7 +4091,7 @@ namespace lh5801_Dis
 
             P += 1; // advance Program Counter
             ushort address = GetWord(); // P += 2
-            disSB.AppendLine(String.Format("STA  ({0})", GetAddOrLabel(address)));
+            disSB.Append(String.Format("STA  ({0}){1}", GetAddOrLabel(address), Environment.NewLine));
             // tick += 12;
         }
 
@@ -4102,7 +4106,7 @@ namespace lh5801_Dis
 
             P += 1; // advance Program Counter
             ushort address = GetWord(); // P += 2
-            disSB.AppendLine(String.Format("BIT  ({0})", GetAddOrLabel(address)));
+            disSB.Append(String.Format("BIT  ({0}){1}", GetAddOrLabel(address), Environment.NewLine));
             //tick += 13;
         }
 
@@ -4120,7 +4124,7 @@ namespace lh5801_Dis
             if (listFormat) { LineDump(P, opBytesP1[0xB0]); } // dump bytes
 
             P += 1; // advance Program Counter
-            disSB.AppendLine("SBC  VH");
+            disSB.Append(String.Format("SBC  VH{0}", Environment.NewLine));
             //tick += 6;
         }
 
@@ -4135,7 +4139,7 @@ namespace lh5801_Dis
 
             P += 1; // advance Program Counter
             byte value = GetByte();
-            disSB.AppendLine(String.Format("SBI  A,${0:X2}", value));
+            disSB.Append(String.Format("SBI  A,${0:X2}{1}", value, Environment.NewLine));
             //tick += 7;
         }
 
@@ -4149,7 +4153,7 @@ namespace lh5801_Dis
             if (listFormat) { LineDump(P, opBytesP1[0xB2]); } // dump bytes
 
             P += 1; // advance Program Counter
-            disSB.AppendLine("ADC  VH");
+            disSB.Append(String.Format("ADC  VH{0}", Environment.NewLine));
             //tick += 6;
         }
 
@@ -4164,7 +4168,7 @@ namespace lh5801_Dis
 
             P += 1; // advance Program Counter
             byte value = this.GetByte(); // P += 1
-            disSB.AppendLine(String.Format("ADI  A,${0:X2}", value));
+            disSB.Append(String.Format("ADI  A,${0:X2}{1}", value, Environment.NewLine));
             //tick += 7;
         }
 
@@ -4178,7 +4182,7 @@ namespace lh5801_Dis
             if (listFormat) { LineDump(P, opBytesP1[0xB4]); } // dump bytes
 
             P += 1; // advance Program Counter
-            disSB.AppendLine("LDA  VH");
+            disSB.Append(String.Format("LDA  VH{0}", Environment.NewLine));
             //tick += 5;
         }
 
@@ -4194,7 +4198,7 @@ namespace lh5801_Dis
 
             P += 1; // advance Program Counter
             byte value = GetByte(); // P += 1
-            disSB.AppendLine(String.Format("LDI  A,${0:X2}", value));
+            disSB.Append(String.Format("LDI  A,${0:X2}{1}", value, Environment.NewLine));
             //tick += 6;
         }
 
@@ -4208,7 +4212,7 @@ namespace lh5801_Dis
             if (listFormat) { LineDump(P, opBytesP1[0xB6]); } // dump bytes
 
             P += 1; // advance Program Counter
-            disSB.AppendLine("CPA  VH");
+            disSB.Append(String.Format("CPA  VH{0}", Environment.NewLine));
             //tick += 6;
         }
 
@@ -4223,7 +4227,7 @@ namespace lh5801_Dis
 
             P += 1; // advance Program Counter
             byte value = GetByte(); // P += 1
-            disSB.AppendLine(String.Format("CPI  A,${0:X2}", value));
+            disSB.Append(String.Format("CPI  A,${0:X2}{1}", value, Environment.NewLine));
             //tick += 7;
         }
 
@@ -4237,7 +4241,7 @@ namespace lh5801_Dis
             if (listFormat) { LineDump(P, opBytesP1[0xB8]); } // dump bytes
 
             P += 1; // advance Program Counter
-            disSB.AppendLine("RPV");
+            disSB.Append(String.Format("RPV{0}", Environment.NewLine));
             //tick += 4;
         }
 
@@ -4252,7 +4256,7 @@ namespace lh5801_Dis
 
             P += 1; // advance Program Counter
             byte value = this.GetByte(); // P += 1
-            disSB.AppendLine(String.Format("ANI  A,${0:X2}", value));
+            disSB.Append(String.Format("ANI  A,${0:X2}{1}", value, Environment.NewLine));
             tick += 7;
         }
 
@@ -4267,8 +4271,7 @@ namespace lh5801_Dis
 
             P += 1; // advance Program Counter
             ushort address = GetWord(); // P += 2
-            disSB.Append("JMP  $");
-            disSB.AppendLine(address.ToString("X4"));
+            disSB.Append(String.Format("JMP  ${0}{1}", address.ToString("X4"), Environment.NewLine));
             //tick += 12;
         }
 
@@ -4283,7 +4286,7 @@ namespace lh5801_Dis
 
             P += 1; // advance Program Counter
             byte value = GetByte();
-            disSB.AppendLine(String.Format("ORI  A,${0:X2}", value));
+            disSB.Append(String.Format("ORI  A,${0:X2}{1}", value, Environment.NewLine));
             tick += 7;
         }
 
@@ -4298,7 +4301,7 @@ namespace lh5801_Dis
             if (listFormat) { LineDump(P, opBytesP1[0xBC]); } // dump bytes
 
             P += 1; // advance Program Counter
-            disSB.AppendLine("DCA  (V)");
+            disSB.Append(String.Format("DCA  (V){0}", Environment.NewLine));
             //tick += 15;
         }
 
@@ -4313,7 +4316,7 @@ namespace lh5801_Dis
 
             P += 1; // advance Program Counter
             byte value = GetByte(); // P += 1
-            disSB.AppendLine(String.Format("EAI  ${0:X2}", value));
+            disSB.Append(String.Format("EAI  ${0:X2}{1}", value, Environment.NewLine));
             //tick += 7;
         }
 
@@ -4328,7 +4331,7 @@ namespace lh5801_Dis
 
             P += 1;                         // advance Program Counter
             ushort address = GetWord();     // P + =2, now pointing to next instruction
-            disSB.AppendLine(String.Format("SJP  {0}", GetAddOrLabel(address)));
+            disSB.Append(String.Format("SJP  {0}{1}", GetAddOrLabel(address), Environment.NewLine));
             //tick += 19;
         }
 
@@ -4343,7 +4346,7 @@ namespace lh5801_Dis
 
             P += 1; // advance Program Counter
             byte value = this.GetByte(); // P += 1
-            disSB.AppendLine(String.Format("BII  A,${0:X2}", value));
+            disSB.Append(String.Format("BII  A,${0:X2}{1}", value, Environment.NewLine));
             //tick += 7;
         }
 
@@ -4361,7 +4364,7 @@ namespace lh5801_Dis
             if (listFormat) { LineDump(P, opBytesP1[0xC0]); } // dump bytes
 
             P += 1;                       // advance Program Counter
-            disSB.AppendLine("VEJ  (C0)");
+            disSB.Append(String.Format("VEJ  (C0){0}", Environment.NewLine));
             //tick += 17;
         }
 
@@ -4389,7 +4392,7 @@ namespace lh5801_Dis
             }
 
             if (listFormat) { LineDump((ushort)(P - numBytes), numBytes); } // dump bytes
-            disSB.AppendLine(String.Format("VCR  {0}", args));
+            disSB.Append(String.Format("VCR  {0}{1}", args, Environment.NewLine));
         }
 
         /// <summary>
@@ -4405,16 +4408,18 @@ namespace lh5801_Dis
             P += 1; // advance Program Counter
             Tuple<String, byte> retValues = new Tuple<String, byte>("", 1);
             byte numBytes = opBytesP1[0xC2];
+            String args = "";
 
             if (disModePC1500)
             {
                 numBytes += 2;
                 if (PeekByte() >= 0xE0) { numBytes += 1; } // +1 bytes if function
                 retValues = VEJ_p_o1(numBytes);
+                args = String.Format(",{0}", retValues.Item1);
             }
 
             if (listFormat) { LineDump((ushort)(P - numBytes), numBytes); } // dump bytes
-            disSB.AppendLine(String.Format("VEJ  (C2),{0}", retValues.Item1));
+            disSB.Append(String.Format("VEJ  (C2){0}{1}", args, Environment.NewLine));
             //tick += 17;
         }
 
@@ -4441,7 +4446,7 @@ namespace lh5801_Dis
             }
 
             if (listFormat) { LineDump((ushort)(P - numBytes), numBytes); } // dump bytes
-            disSB.AppendLine(String.Format("VCS  {0}", args));
+            disSB.Append(String.Format("VCS  {0}{1}", args, Environment.NewLine));
         }
 
         /// <summary>
@@ -4457,16 +4462,18 @@ namespace lh5801_Dis
             Tuple<String, byte> retValues = new Tuple<String, byte>("", 1);
             P += 1; // advance Program Counter
             byte numBytes = opBytesP1[0xC4];
+            String args = "";
 
             if (disModePC1500)
             {
                 numBytes += 2;
                 if (PeekByte() >= 0xE0) { numBytes += 1; } // +1 bytes if function
                 retValues = VEJ_p_o1(numBytes);
+                args = String.Format(",{0}", retValues.Item1);
             }
 
             if (listFormat) { LineDump((ushort)(P - numBytes), numBytes); } // dump bytes
-            disSB.AppendLine(String.Format("VEJ  (C4),{0}", retValues.Item1));
+            disSB.Append(String.Format("VEJ  (C4){0}{1}", args, Environment.NewLine));
             //tick += 17;    
         }
 
@@ -4493,7 +4500,7 @@ namespace lh5801_Dis
             }
 
             if (listFormat) { LineDump((ushort)(P - numBytes), numBytes); } // dump bytes
-            disSB.AppendLine(String.Format("VHR  {0}", args));
+            disSB.Append(String.Format("VHR  {0}{1}", args, Environment.NewLine));
         }
 
         /// <summary>
@@ -4506,7 +4513,7 @@ namespace lh5801_Dis
             if (listFormat) { LineDump(P, opBytesP1[0xC6]); } // dump bytes
 
             P += 1; // advance Program Counter
-            disSB.AppendLine("VEJ  (C6)");
+            disSB.Append(String.Format("VEJ  (C6){0}", Environment.NewLine));
             //tick += 17;
         }
 
@@ -4533,7 +4540,7 @@ namespace lh5801_Dis
             }
 
             if (listFormat) { LineDump((ushort)(P - numBytes), numBytes); } // dump bytes
-            disSB.AppendLine(String.Format("VHS  {0}", args));
+            disSB.Append(String.Format("VHS  {0}{1}", args, Environment.NewLine));
         }
 
         /// <summary>
@@ -4559,7 +4566,7 @@ namespace lh5801_Dis
             }
 
             if (listFormat) { LineDump((ushort)(P - numBytes), numBytes); } // dump bytes
-            disSB.AppendLine(String.Format("VEJ  (C8){0}", args));
+            disSB.Append(String.Format("VEJ  (C8){0}{1}", args, Environment.NewLine));
             //tick += 17;
         }
 
@@ -4586,7 +4593,7 @@ namespace lh5801_Dis
             }
 
             if (listFormat) { LineDump((ushort)(P - numBytes), numBytes); } // dump bytes
-            disSB.AppendLine(String.Format("VZR  {0}", args));
+            disSB.Append(String.Format("VZR  {0}{1}", args, Environment.NewLine));
         }
 
         /// <summary>
@@ -4612,7 +4619,7 @@ namespace lh5801_Dis
             }
 
             if (listFormat) { LineDump((ushort)(P - numBytes), numBytes); } // dump bytes
-            disSB.AppendLine(String.Format("VEJ  (CA){0}", args));
+            disSB.Append(String.Format("VEJ  (CA){0}{1}", args, Environment.NewLine));
             //tick += 17;
         }
 
@@ -4639,7 +4646,7 @@ namespace lh5801_Dis
             }
 
             if (listFormat) { LineDump((ushort)(P - numBytes), numBytes); } // dump bytes
-            disSB.AppendLine(String.Format("VZS  {0}", args));
+            disSB.Append(String.Format("VZS  {0}{1}", args, Environment.NewLine));
         }
 
         /// <summary>
@@ -4665,7 +4672,7 @@ namespace lh5801_Dis
             }
 
             if (listFormat) { LineDump((ushort)(P - numBytes), numBytes); } // dump bytes
-            disSB.AppendLine(String.Format("VEJ  (CC){0}", args));
+            disSB.Append(String.Format("VEJ  (CC){0}{1}", args, Environment.NewLine));
             //tick += 17;
         }
 
@@ -4693,7 +4700,7 @@ namespace lh5801_Dis
             }
 
             if (listFormat) { LineDump((ushort)(P - numBytes), numBytes); } // dump bytes
-            disSB.AppendLine(String.Format("VMJ  {0}", args));
+            disSB.Append(String.Format("VMJ  {0}{1}", args, Environment.NewLine));
         }
 
         /// <summary>
@@ -4719,7 +4726,7 @@ namespace lh5801_Dis
             }
 
             if (listFormat) { LineDump((ushort)(P - numBytes), numBytes); } // dump bytes
-            disSB.AppendLine(String.Format("VEJ  (CE){0}", args));
+            disSB.Append(String.Format("VEJ  (CE){0}{1}", args, Environment.NewLine));
             //tick += 17;
         }
 
@@ -4746,7 +4753,7 @@ namespace lh5801_Dis
             }
 
             if (listFormat) { LineDump((ushort)(P - numBytes), numBytes); } // dump bytes
-            disSB.AppendLine(String.Format("VVS  {0}", args));
+            disSB.Append(String.Format("VVS  {0}{1}", args, Environment.NewLine));
         }
 
         #endregion Opcodes_0xC0-0xCF
@@ -4776,7 +4783,7 @@ namespace lh5801_Dis
             }
 
             if (listFormat) { LineDump((ushort)(P - numBytes), numBytes); } // dump bytes
-            disSB.AppendLine(String.Format("VEJ  (D0){0}", args));
+            disSB.Append(String.Format("VEJ  (D0){0}{1}", args, Environment.NewLine));
             //tick += 17;
         }
 
@@ -4790,7 +4797,7 @@ namespace lh5801_Dis
             if (listFormat) { LineDump(P, opBytesP1[0xD1]); } // dump bytes
 
             P += 1; // advance Program Counter
-            disSB.AppendLine("ROR");
+            disSB.Append(String.Format("ROR{0}", Environment.NewLine));
             //tick += 9;
         }
 
@@ -4817,7 +4824,7 @@ namespace lh5801_Dis
             }
 
             if (listFormat) { LineDump((ushort)(P - numBytes), numBytes); } // dump bytes
-            disSB.AppendLine(String.Format("VEJ  (D2){0}", args));
+            disSB.Append(String.Format("VEJ  (D2){0}{1}", args, Environment.NewLine));
             //tick += 17;
         }
 
@@ -4832,7 +4839,7 @@ namespace lh5801_Dis
             if (listFormat) { LineDump(P, opBytesP1[0xD3]); } // dump bytes
 
             P += 1; // advance Program Counter
-            disSB.AppendLine("DDR  (X)");
+            disSB.Append(String.Format("DDR  (X){0}", Environment.NewLine));
             //tick += 12;
         }
 
@@ -4860,7 +4867,7 @@ namespace lh5801_Dis
             }
 
             if (listFormat) { LineDump((ushort)(P - numBytes), numBytes); } // dump bytes
-            disSB.AppendLine(String.Format("VEJ  (D4){0}", args));
+            disSB.Append(String.Format("VEJ  (D4){0}{1}", args, Environment.NewLine));
             //tick += 17;
         }
 
@@ -4874,7 +4881,7 @@ namespace lh5801_Dis
             if (listFormat) { LineDump(P, opBytesP1[0xD5]); } // dump bytes
 
             P += 1; // advance Program Counter
-            disSB.AppendLine("SHR");
+            disSB.Append(String.Format("SHR{0}", Environment.NewLine));
             //tick += 9;
         }
 
@@ -4901,7 +4908,7 @@ namespace lh5801_Dis
             }
 
             if (listFormat) { LineDump((ushort)(P - numBytes), numBytes); } // dump bytes
-            disSB.AppendLine(String.Format("VEJ  (D6){0}", args));
+            disSB.Append(String.Format("VEJ  (D6){0}{1}", args, Environment.NewLine));
             //tick += 17;
         }
 
@@ -4916,7 +4923,7 @@ namespace lh5801_Dis
             if (listFormat) { LineDump(P, opBytesP1[0xD1]); } // dump bytes
 
             P += 1; // advance Program Counter
-            disSB.AppendLine("DRL  (X)");
+            disSB.Append(String.Format("DRL  (X){0}", Environment.NewLine));
             //tick += 12;
         }
 
@@ -4930,7 +4937,7 @@ namespace lh5801_Dis
             if (listFormat) { LineDump(P, opBytesP1[0xD8]); } // dump bytes
 
             P += 1; // advance Program Counter
-            disSB.AppendLine("VEJ  (D8)");
+            disSB.Append(String.Format("VEJ  (D8){0}", Environment.NewLine));
             //tick += 17;
         }
 
@@ -4944,7 +4951,7 @@ namespace lh5801_Dis
             if (listFormat) { LineDump(P, opBytesP1[0xD9]); } // dump bytes
 
             P += 1; // advance Program Counter
-            disSB.AppendLine("SHL");
+            disSB.Append(String.Format("SHL{0}", Environment.NewLine));
             //tick += 6;
         }
 
@@ -4958,7 +4965,7 @@ namespace lh5801_Dis
             if (listFormat) { LineDump(P, opBytesP1[0xDA]); } // dump bytes
 
             P += 1; // advance Program Counter
-            disSB.AppendLine("VEJ  (DA)");
+            disSB.Append(String.Format("VEJ  (DA){0}", Environment.NewLine));
             //tick += 17;
         }
 
@@ -4972,7 +4979,7 @@ namespace lh5801_Dis
             if (listFormat) { LineDump(P, opBytesP1[0xDB]); } // dump bytes
 
             P += 1; // advance Program Counter
-            disSB.AppendLine("ROL");
+            disSB.Append(String.Format("ROL{0}", Environment.NewLine));
             //tick += 8;
         }
 
@@ -4986,7 +4993,7 @@ namespace lh5801_Dis
             if (listFormat) { LineDump(P, opBytesP1[0xDC]); } // dump bytes
 
             P += 1; // advance Program Counter
-            disSB.AppendLine("VEJ  (DC)");
+            disSB.Append(String.Format("VEJ  (DC){0}", Environment.NewLine));
             //tick += 17;
         }
 
@@ -5000,7 +5007,7 @@ namespace lh5801_Dis
             if (listFormat) { LineDump(P, opBytesP1[0xDD]); } // dump bytes
 
             P += 1; // advance Program Counter
-            disSB.AppendLine("INC  A");
+            disSB.Append(String.Format("INC  A{0}", Environment.NewLine));
             //tick += 5;
         }
 
@@ -5028,7 +5035,7 @@ namespace lh5801_Dis
             }
 
             if (listFormat) { LineDump((ushort)(P - numBytes), numBytes); } // dump bytes
-            disSB.AppendLine(String.Format("VEJ  (DE){0}", args));
+            disSB.Append(String.Format("VEJ  (DE){0}{1}", args, Environment.NewLine));
             //tick += 17;
         }
 
@@ -5042,7 +5049,7 @@ namespace lh5801_Dis
             if (listFormat) { LineDump(P, opBytesP1[0xDF]); } // dump bytes
 
             P += 1; // advance Program Counter
-            disSB.AppendLine("DEC  A");
+            disSB.Append(String.Format("DEC  A{0}", Environment.NewLine));
             //tick += 5;
         }
 
@@ -5060,7 +5067,7 @@ namespace lh5801_Dis
             if (listFormat) { LineDump(P, opBytesP1[0xE0]); } // dump bytes
 
             P += 1; // advance Program Counter
-            disSB.AppendLine("VEJ  (E0)");
+            disSB.Append(String.Format("VEJ  (E0){0}", Environment.NewLine));
             //tick += 17;
         }
 
@@ -5074,7 +5081,7 @@ namespace lh5801_Dis
             if (listFormat) { LineDump(P, opBytesP1[0xE1]); } // dump bytes
 
             P += 1; // advance Program Counter
-            disSB.AppendLine("SPU");
+            disSB.Append(String.Format("SPU{0}", Environment.NewLine));
             //tick += 4;
         }
 
@@ -5088,7 +5095,7 @@ namespace lh5801_Dis
             if (listFormat) { LineDump(P, opBytesP1[0xE2]); } // dump bytes
 
             P += 1; // advance Program Counter
-            disSB.AppendLine("VEJ  (E2)");
+            disSB.Append(String.Format("VEJ  (E2){0}", Environment.NewLine));
             //tick += 17;
         }
 
@@ -5102,7 +5109,7 @@ namespace lh5801_Dis
             if (listFormat) { LineDump(P, opBytesP1[0xE3]); } // dump bytes
 
             P += 1; // advance Program Counter
-            disSB.AppendLine("RPU");
+            disSB.Append(String.Format("RPU{0}", Environment.NewLine));
             //tick += 4;
         }
 
@@ -5116,7 +5123,7 @@ namespace lh5801_Dis
             if (listFormat) { LineDump(P, opBytesP1[0xE4]); } // dump bytes
 
             P += 1; // advance Program Counter
-            disSB.AppendLine("VEJ  (E4)");
+            disSB.Append(String.Format("VEJ  (E4){0}", Environment.NewLine));
             //tick += 17;
         }
 
@@ -5130,7 +5137,7 @@ namespace lh5801_Dis
             if (listFormat) { LineDump(P, opBytesP1[0xE6]); } // dump bytes
 
             P += 1; // advance Program Counter
-            disSB.AppendLine("VEJ  (E6)");
+            disSB.Append(String.Format("VEJ  (E6){0}", Environment.NewLine));
             //tick += 17;
         }
 
@@ -5144,7 +5151,7 @@ namespace lh5801_Dis
             if (listFormat) { LineDump(P, opBytesP1[0xE8]); } // dump bytes
 
             P += 1; // advance Program Counter
-            disSB.AppendLine("VEJ  (E8)");
+            disSB.Append(String.Format("VEJ  (E8){0}", Environment.NewLine));
             //tick += 17;
         }
 
@@ -5160,7 +5167,7 @@ namespace lh5801_Dis
             P += 1; // advance Program Counter
             ushort address = GetWord(); // P += 2
             byte value = GetByte();     // P += 1
-            disSB.AppendLine(String.Format("ANI  ({0}),${1:X2}", GetAddOrLabel(address), value));
+            disSB.Append(String.Format("ANI  ({0}),${1:X2}{2}", GetAddOrLabel(address), value, Environment.NewLine));
             //tick += 19;
         }
 
@@ -5174,7 +5181,7 @@ namespace lh5801_Dis
             if (listFormat) { LineDump(P, opBytesP1[0xEA]); } // dump bytes
 
             P += 1; // advance Program Counter
-            disSB.AppendLine("VEJ  (EA)");
+            disSB.Append(String.Format("VEJ  (EA){0}", Environment.NewLine));
             //tick += 17;
         }
 
@@ -5190,7 +5197,7 @@ namespace lh5801_Dis
             P += 1; // advance Program Counter
             ushort address = GetWord();
             byte value = GetByte();
-            disSB.AppendLine(String.Format("ORI  ({0}),${1:X2}", GetAddOrLabel(address), value));
+            disSB.Append(String.Format("ORI  ({0}),${1:X2}{2}", GetAddOrLabel(address), value, Environment.NewLine));
             //tick += 19;
         }
 
@@ -5204,7 +5211,7 @@ namespace lh5801_Dis
             if (listFormat) { LineDump(P, opBytesP1[0xEC]); } // dump bytes
 
             P += 1; // advance Program Counter
-            disSB.AppendLine("VEJ  (EC)");
+            disSB.Append(String.Format("VEJ  (EC){0}", Environment.NewLine));
             //tick += 17;
         }
 
@@ -5220,7 +5227,7 @@ namespace lh5801_Dis
             P += 1; // advance Program Counter
             ushort address = GetWord(); // P += 2
             byte value = this.GetByte(); // P += 1
-            disSB.AppendLine(String.Format("BII  ({0}),${1:X2}", GetAddOrLabel(address), value));
+            disSB.Append(String.Format("BII  ({0}),${1:X2}{2}", GetAddOrLabel(address), value, Environment.NewLine));
             //tick += 16;
         }
 
@@ -5234,7 +5241,7 @@ namespace lh5801_Dis
             if (listFormat) { LineDump(P, opBytesP1[0xEE]); } // dump bytes
 
             P += 1; // advance Program Counter
-            disSB.AppendLine("VEJ  (EE)");
+            disSB.Append(String.Format("VEJ  (EE){0}" ,Environment.NewLine));
             //tick += 17;
         }
 
@@ -5250,7 +5257,7 @@ namespace lh5801_Dis
             P += 1; // advance Program Counter
             ushort address = GetWord(); // P += 2
             byte value = GetByte();     // P += 1
-            disSB.AppendLine(String.Format("ADI  ({0}),${1:X2}", GetAddOrLabel(address), value));
+            disSB.Append(String.Format("ADI  ({0}),${1:X2}{2}", GetAddOrLabel(address), value, Environment.NewLine));
             //tick += 19;
         }
 
@@ -5268,7 +5275,7 @@ namespace lh5801_Dis
             if (listFormat) { LineDump(P, opBytesP1[0xF0]); } // dump bytes
 
             P += 1; // advance Program Counter
-            disSB.AppendLine("VEJ  (F0)");
+            disSB.Append(String.Format("VEJ  (F0){0}", Environment.NewLine));
             //tick += 17;
         }
 
@@ -5282,7 +5289,7 @@ namespace lh5801_Dis
             if (listFormat) { LineDump(P, opBytesP1[0xF1]); } // dump bytes
 
             P += 1; // advance Program Counter
-            disSB.AppendLine("AEX");
+            disSB.Append(String.Format("AEX{0}", Environment.NewLine));
             //tick += 6;
         }
 
@@ -5296,7 +5303,7 @@ namespace lh5801_Dis
             if (listFormat) { LineDump(P, opBytesP1[0xF2]); } // dump bytes
 
             P += 1; // advance Program Counter
-            disSB.AppendLine("VEJ  (F2)");
+            disSB.Append(String.Format("VEJ  (F2){0}", Environment.NewLine));
             //tick += 17;
         }
 
@@ -5323,7 +5330,7 @@ namespace lh5801_Dis
             }
 
             if (listFormat) { LineDump((ushort)(P - numBytes), numBytes); } // dump bytes
-            disSB.AppendLine(String.Format("VEJ  (F4){0}", args));
+            disSB.Append(String.Format("VEJ  (F4){0}{1}", args, Environment.NewLine));
             //tick += 17;
         }
 
@@ -5337,7 +5344,7 @@ namespace lh5801_Dis
             if (listFormat) { LineDump(P, opBytesP1[0xF5]); } // dump bytes
 
             P += 1; // advance Program Counter
-            disSB.AppendLine("TIN");
+            disSB.Append(String.Format("TIN{0}", Environment.NewLine));
             //tick += 7;
         }
 
@@ -5364,7 +5371,7 @@ namespace lh5801_Dis
             }
 
             if (listFormat) { LineDump((ushort)(P - numBytes), numBytes); } // dump bytes
-            disSB.AppendLine(String.Format("VEJ  (F6){0}", args));
+            disSB.Append(String.Format("VEJ  (F6){0}{1}", args, Environment.NewLine));
             //tick += 17;
         }
 
@@ -5378,7 +5385,7 @@ namespace lh5801_Dis
             if (listFormat) { LineDump(P, opBytesP1[0xF7]); } // dump bytes
 
             P += 1; // advance Program Counter
-            disSB.AppendLine("CIN");
+            disSB.Append(String.Format("CIN{0}", Environment.NewLine));
             //tick += 8;
         }
 
@@ -5392,7 +5399,7 @@ namespace lh5801_Dis
             if (listFormat) { LineDump(P, opBytesP1[0xF8]); } // dump bytes
 
             P += 1;  // advance Program Counter
-            disSB.AppendLine("VEJ  (F8)");
+            disSB.Append(String.Format("VEJ  (F8){0}", Environment.NewLine));
             //tick += 17;
         }
 
@@ -5406,7 +5413,7 @@ namespace lh5801_Dis
             if (listFormat) { LineDump(P, opBytesP1[0xF9]); } // dump bytes
 
             P += 1; // advance Program Counter
-            disSB.AppendLine("REC");
+            disSB.Append(String.Format("REC{0}", Environment.NewLine));
             //tick += 4;
         }
 
@@ -5420,7 +5427,7 @@ namespace lh5801_Dis
             if (listFormat) { LineDump(P, opBytesP1[0xFA]); } // dump bytes
 
             P += 1; // advance Program Counter
-            disSB.AppendLine("VEJ  (FA)");
+            disSB.Append(String.Format("VEJ  (FA){0}", Environment.NewLine));
             //tick += 17;
         }
 
@@ -5434,7 +5441,7 @@ namespace lh5801_Dis
             if (listFormat) { LineDump(P, opBytesP1[0xFB]); } // dump bytes
 
             P += 1; // advance Program Counter
-            disSB.AppendLine("SEC");
+            disSB.Append(String.Format("SEC{0}", Environment.NewLine));
             //tick += 4;
         }
 
@@ -5448,7 +5455,7 @@ namespace lh5801_Dis
             if (listFormat) { LineDump(P, opBytesP1[0xFC]); } // dump bytes
 
             P += 1; // advance Program Counter
-            disSB.AppendLine("VEJ  (FC)");
+            disSB.Append(String.Format("VEJ  (FC){0}", Environment.NewLine));
             //tick += 17;
         }
 
@@ -5474,7 +5481,7 @@ namespace lh5801_Dis
             if (listFormat) { LineDump(P, opBytesP1[0xF1]); } // dump bytes
 
             P += 1;  // advance Program Counter
-            disSB.AppendLine("VEJ  (FE)");
+            disSB.Append(String.Format("VEJ  (FE){0}", Environment.NewLine));
             //tick += 17;
         }
 
@@ -5497,7 +5504,7 @@ namespace lh5801_Dis
 
             // FD handled before hand P += 1
             P += 1; // advance Program Counter
-            disSB.AppendLine("SBC  #(X)");
+            disSB.Append(String.Format("SBC  #(X){0}", Environment.NewLine));
             //tick += 11;
         }
         
@@ -5511,7 +5518,7 @@ namespace lh5801_Dis
 
             // FD handled before hand P += 1
             P += 1; // advance Program Counter
-            disSB.AppendLine("ADC  #(X)");
+            disSB.Append(String.Format("ADC  #(X){0}", Environment.NewLine));
             //tick += 11;
         }
 
@@ -5526,7 +5533,7 @@ namespace lh5801_Dis
 
             // FD handled before hand P += 1
             P += 1; // advance Program Counter
-            disSB.AppendLine("LDA  #(X)");
+            disSB.Append(String.Format("LDA  #(X){0}", Environment.NewLine));
             //tick += 10;
         }
 
@@ -5541,7 +5548,7 @@ namespace lh5801_Dis
 
             // FD handled before hand P += 1
             P += 1; // advance Program Counter
-            disSB.AppendLine("CPA  #(X)");
+            disSB.Append(String.Format("CPA  #(X){0}", Environment.NewLine));
             //tick += 11;
         }
 
@@ -5556,7 +5563,7 @@ namespace lh5801_Dis
 
             // FD handled before hand P += 1
             P += 1; // advance Program Counter
-            disSB.AppendLine("LDX  X");
+            disSB.Append(String.Format("LDX  X{0}", Environment.NewLine));
             //tick += 11;
         }
 
@@ -5571,7 +5578,7 @@ namespace lh5801_Dis
 
             // FD handled before hand P += 1
             P += 1; // advance Program Counter
-            disSB.AppendLine("AND  #(X)");
+            disSB.Append(String.Format("AND  #(X){0}", Environment.NewLine));
             //tick += 11;
         }
 
@@ -5586,7 +5593,7 @@ namespace lh5801_Dis
 
             // FD handled before hand P += 1
             P += 1; // advance Program Counter
-            disSB.AppendLine("POP  X");
+            disSB.Append(String.Format("POP  X{0}", Environment.NewLine));
             //tick += 15;
         }
 
@@ -5601,7 +5608,7 @@ namespace lh5801_Dis
 
             // FD handled before hand P += 1
             P += 1; // advance Program Counter
-            disSB.AppendLine("ORA  #(X)");
+            disSB.Append(String.Format("ORA  #(X){0}", Environment.NewLine));
             //tick += 11;
         }
 
@@ -5616,7 +5623,7 @@ namespace lh5801_Dis
 
             // FD handled before hand P += 1
             P += 1; // advance Program Counter
-            disSB.AppendLine("DCS  #(X)");
+            disSB.Append(String.Format("DCS  #(X){0}", Environment.NewLine));
             //tick += 17;
         }
 
@@ -5631,7 +5638,7 @@ namespace lh5801_Dis
             
             // FD handled before hand P += 1
             P += 1; // advance Program Counter
-            disSB.AppendLine("EOR  #(X)");
+            disSB.Append(String.Format("EOR  #(X){0}", Environment.NewLine));
             //tick += 11;
         }
 
@@ -5646,7 +5653,7 @@ namespace lh5801_Dis
 
             // FD handled before hand P += 1
             P += 1; // advance Program Counter
-            disSB.AppendLine("STA  #(X)");
+            disSB.Append(String.Format("STA  #(X){0}", Environment.NewLine));
             //tick += 10;
         }
 
@@ -5660,7 +5667,7 @@ namespace lh5801_Dis
             if (listFormat) { LineDump((ushort)(P - 1), opBytesP2[0x0F]); } // dump bytes
 
             P += 1; // advance Program Counter
-            disSB.AppendLine("BIT  #(X)");
+            disSB.Append(String.Format("BIT  #(X){0}", Environment.NewLine));
             //tick += 11;
         }
 
@@ -5679,7 +5686,7 @@ namespace lh5801_Dis
 
             // FD handled before hand P += 1
             P += 1; // advance Program Counter
-            disSB.AppendLine("SBC  #(Y)");
+            disSB.Append(String.Format("SBC  #(Y){0}", Environment.NewLine));
             //tick += 11;
         }
 
@@ -5693,7 +5700,7 @@ namespace lh5801_Dis
 
             // FD handled before hand P += 1
             P += 1; // advance Program Counter
-            disSB.AppendLine("ADC  #(Y)");
+            disSB.Append(String.Format("ADC  #(Y){0}", Environment.NewLine));
             //tick += 11;
         }
 
@@ -5708,7 +5715,7 @@ namespace lh5801_Dis
 
             // FD handled before hand P += 1
             P += 1; // advance Program Counter
-            disSB.AppendLine("LDA  #(Y)");
+            disSB.Append(String.Format("LDA  #(Y){0}", Environment.NewLine));
             //tick += 10;
         }
 
@@ -5723,7 +5730,7 @@ namespace lh5801_Dis
 
             // FD handled before hand P += 1
             P += 1; // advance Program Counter
-            disSB.AppendLine("CPA  #(Y)");
+            disSB.Append(String.Format("CPA  #(Y){0}", Environment.NewLine));
             //tick += 11;
         }
 
@@ -5737,7 +5744,7 @@ namespace lh5801_Dis
             if (listFormat) { LineDump((ushort)(P - 1), opBytesP2[0x18]); } // dump bytes
 
             P += 1; // advance Program Counter
-            disSB.AppendLine("LDX  Y");
+            disSB.Append(String.Format("LDX  Y{0}", Environment.NewLine));
             //tick += 11;
         }
 
@@ -5752,7 +5759,7 @@ namespace lh5801_Dis
 
             // FD handled before hand P += 1
             P += 1; // advance Program Counter
-            disSB.AppendLine("AND  #(Y)");
+            disSB.Append(String.Format("AND  #(Y){0}", Environment.NewLine));
             //tick += 11;
         }
 
@@ -5767,7 +5774,7 @@ namespace lh5801_Dis
 
             // FD handled before hand P += 1
             P += 1; // advance Program Counter
-            disSB.AppendLine("POP  Y");
+            disSB.Append(String.Format("POP  Y{0}", Environment.NewLine));
             //tick += 15;
         }
 
@@ -5782,7 +5789,7 @@ namespace lh5801_Dis
 
             // FD handled before hand P += 1
             P += 1; // advance Program Counter
-            disSB.AppendLine("ORA  #(Y)");
+            disSB.Append(String.Format("ORA  #(Y){0}", Environment.NewLine));
             //tick += 11;
         }
 
@@ -5797,7 +5804,7 @@ namespace lh5801_Dis
 
             // FD handled before hand P += 1
             P += 1; // advance Program Counter
-            disSB.AppendLine("DCS  #(Y)");
+            disSB.Append(String.Format("DCS  #(Y){0}", Environment.NewLine));
             //tick += 17;
         }
 
@@ -5812,7 +5819,7 @@ namespace lh5801_Dis
 
             // FD handled before hand P += 1
             P += 1; // advance Program Counter
-            disSB.AppendLine("EOR  #(Y)");
+            disSB.Append(String.Format("EOR  #(Y){0}", Environment.NewLine));
             //tick += 11;
         }
 
@@ -5827,7 +5834,7 @@ namespace lh5801_Dis
 
             // FD handled before hand P += 1
             P += 1; // advance Program Counter
-            disSB.AppendLine("STA  #(Y)");
+            disSB.Append(String.Format("STA  #(Y){0}", Environment.NewLine));
             //tick += 10;
         }
 
@@ -5841,7 +5848,7 @@ namespace lh5801_Dis
             if (listFormat) { LineDump((ushort)(P - 1), opBytesP2[0x1F]); } // dump bytes
 
             P += 1; // advance Program Counter
-            disSB.AppendLine("BIT  #(Y)");
+            disSB.Append(String.Format("BIT  #(Y){0}", Environment.NewLine));
             //tick += 11;
         }
 
@@ -5860,7 +5867,7 @@ namespace lh5801_Dis
 
             // FD handled before hand P += 1
             P += 1; // advance Program Counter
-            disSB.AppendLine("SBC  #(U)");
+            disSB.Append(String.Format("SBC  #(U){0}", Environment.NewLine));
             //tick += 11;
         }
 
@@ -5874,7 +5881,7 @@ namespace lh5801_Dis
 
             // FD handled before hand P += 1
             P += 1; // advance Program Counter
-            disSB.AppendLine("ADC  #(U)");
+            disSB.Append(String.Format("ADC  #(U){0}", Environment.NewLine));
             //tick += 11;
         }
 
@@ -5889,7 +5896,7 @@ namespace lh5801_Dis
 
             // FD handled before hand P += 1
             P += 1; // advance Program Counter
-            disSB.AppendLine("LDA  #(U)");
+            disSB.Append(String.Format("LDA  #(U){0}", Environment.NewLine));
             //tick += 10;
         }
 
@@ -5904,7 +5911,7 @@ namespace lh5801_Dis
 
             // FD handled before hand P += 1
             P += 1; // advance Program Counter
-            disSB.AppendLine("CPA  #(U)");
+            disSB.Append(String.Format("CPA  #(U){0}", Environment.NewLine));
             //tick += 11;
         }
 
@@ -5918,7 +5925,7 @@ namespace lh5801_Dis
             if (listFormat) { LineDump((ushort)(P - 1), opBytesP2[0x28]); } // dump bytes
 
             P += 1; // advance Program Counter
-            disSB.AppendLine("LDX  U");
+            disSB.Append(String.Format("LDX  U{0}", Environment.NewLine));
             //tick += 11;
         }
 
@@ -5933,7 +5940,7 @@ namespace lh5801_Dis
 
             // FD handled before hand P += 1
             P += 1; // advance Program Counter
-            disSB.AppendLine("AND  #(U)");
+            disSB.Append(String.Format("AND  #(U){0}", Environment.NewLine));
             //tick += 11;
         }
 
@@ -5948,7 +5955,7 @@ namespace lh5801_Dis
 
             // FD handled before hand P += 1
             P += 1; // advance Program Counter
-            disSB.AppendLine("POP  U");
+            disSB.Append(String.Format("POP  U{0}", Environment.NewLine));
             //tick += 15;
         }
 
@@ -5963,7 +5970,7 @@ namespace lh5801_Dis
 
             // FD handled before hand P += 1
             P += 1; // advance Program Counter
-            disSB.AppendLine("ORA  #(U)");
+            disSB.Append(String.Format("ORA  #(U){0}", Environment.NewLine));
             //tick += 11;
         }
 
@@ -5978,7 +5985,7 @@ namespace lh5801_Dis
 
             // FD handled before hand P += 1
             P += 1; // advance Program Counter
-            disSB.AppendLine("DCS  #(U)");
+            disSB.Append(String.Format("DCS  #(U){0}", Environment.NewLine));
             //tick += 17;
         }
 
@@ -5993,7 +6000,7 @@ namespace lh5801_Dis
 
             // FD handled before hand P += 1
             P += 1; // advance Program Counter
-            disSB.AppendLine("EOR  #(U)");
+            disSB.Append(String.Format("EOR  #(U){0}", Environment.NewLine));
             //tick += 11;
         }
 
@@ -6008,7 +6015,7 @@ namespace lh5801_Dis
 
             // FD handled before hand P += 1
             P += 1; // advance Program Counter
-            disSB.AppendLine("STA  #(U)");
+            disSB.Append(String.Format("STA  #(U){0}", Environment.NewLine));
             //tick += 10;
         }
 
@@ -6022,7 +6029,7 @@ namespace lh5801_Dis
             if (listFormat) { LineDump((ushort)(P - 1), opBytesP2[0x2F]); } // dump bytes
 
             P += 1; // advance Program Counter
-            disSB.AppendLine("BIT  #(U)");
+            disSB.Append(String.Format("BIT  #(U){0}", Environment.NewLine));
             tick += 11;
         }
 
@@ -6041,7 +6048,7 @@ namespace lh5801_Dis
 
             // FD handled before hand P += 1
             P += 1; // advance Program Counter
-            disSB.AppendLine("SBC  #(V)");
+            disSB.Append(String.Format("SBC  #(V){0}", Environment.NewLine));
             //tick += 11;
         }
 
@@ -6055,7 +6062,7 @@ namespace lh5801_Dis
 
             // FD handled before hand P += 1
             P += 1; // advance Program Counter
-            disSB.AppendLine("ADC  #(V)");
+            disSB.Append(String.Format("ADC  #(V){0}", Environment.NewLine));
             //tick += 11;
         }
 
@@ -6070,7 +6077,7 @@ namespace lh5801_Dis
 
             // FD handled before hand P += 1
             P += 1; // advance Program Counter
-            disSB.AppendLine("LDA  #(V)");
+            disSB.Append(String.Format("LDA  #(V){0}", Environment.NewLine));
             //tick += 10;
         }
 
@@ -6085,7 +6092,7 @@ namespace lh5801_Dis
 
             // FD handled before hand P += 1
             P += 1; // advance Program Counter
-            disSB.AppendLine("CPA  #(V)");
+            disSB.Append(String.Format("CPA  #(V){0}", Environment.NewLine));
             //tick += 11;
         }
 
@@ -6100,7 +6107,7 @@ namespace lh5801_Dis
 
             // FD handled before hand P += 1
             P += 1; // advance Program Counter
-            disSB.AppendLine("LDX  V");
+            disSB.Append(String.Format("LDX  V{0}", Environment.NewLine));
             //tick += 11;
         }
 
@@ -6115,7 +6122,7 @@ namespace lh5801_Dis
 
             // FD handled before hand P += 1
             P += 1; // advance Program Counter
-            disSB.AppendLine("AND  #(V)");
+            disSB.Append(String.Format("AND  #(V){0}", Environment.NewLine));
             //tick += 11;
         }
 
@@ -6130,7 +6137,7 @@ namespace lh5801_Dis
 
             // FD handled before hand P += 1
             P += 1; // advance Program Counter
-            disSB.AppendLine("POP  V");
+            disSB.Append(String.Format("POP  V{0}", Environment.NewLine));
             //tick += 15;
         }
 
@@ -6145,7 +6152,7 @@ namespace lh5801_Dis
 
             // FD handled before hand P += 1
             P += 1; // advance Program Counter
-            disSB.AppendLine("ORA  #(V)");
+            disSB.Append(String.Format("ORA  #(V){0}", Environment.NewLine));
             //tick += 11;
         }
 
@@ -6160,7 +6167,7 @@ namespace lh5801_Dis
 
             // FD handled before hand P += 1
             P += 1; // advance Program Counter
-            disSB.AppendLine("DCS  #(V)");
+            disSB.Append(String.Format("DCS  #(V){0}", Environment.NewLine));
             //tick += 17;
         }
 
@@ -6175,7 +6182,7 @@ namespace lh5801_Dis
 
             // FD handled before hand P += 1
             P += 1; // advance Program Counter
-            disSB.AppendLine("EOR  #(V)");
+            disSB.Append(String.Format("EOR  #(V){0}", Environment.NewLine));
             //tick += 11;
         }
 
@@ -6190,7 +6197,7 @@ namespace lh5801_Dis
 
             // FD handled before hand P += 1
             P += 1; // advance Program Counter
-            disSB.AppendLine("STA  #(V)");
+            disSB.Append(String.Format("STA  #(V){0}", Environment.NewLine));
             //tick += 10;
         }
 
@@ -6205,7 +6212,7 @@ namespace lh5801_Dis
 
             // FD handled before hand P += 1
             P += 1; // advance Program Counter
-            disSB.AppendLine("BIT  #(V)");
+            disSB.Append(String.Format("BIT  #(V){0}", Environment.NewLine));
             //tick += 11;
         }
 
@@ -6224,7 +6231,7 @@ namespace lh5801_Dis
 
             // FD handled before hand P += 1
             P += 1; // advance Program Counter
-            disSB.AppendLine("INC  XH");
+            disSB.Append(String.Format("INC  XH{0}", Environment.NewLine));
             //tick += 9;
         }
 
@@ -6239,7 +6246,7 @@ namespace lh5801_Dis
 
             // FD handled before hand P += 1
             P += 1; // advance Program Counter
-            disSB.AppendLine("DEC  XH");
+            disSB.Append(String.Format("DEC  XH{0}", Environment.NewLine));
             //tick += 9;
         }
 
@@ -6253,7 +6260,7 @@ namespace lh5801_Dis
             if (listFormat) { LineDump((ushort)(P - 1), opBytesP2[0x48]); } // dump bytes
 
             P += 1; // advance Program Counter
-            disSB.AppendLine("LDX  S");
+            disSB.Append(String.Format("LDX  S{0}", Environment.NewLine));
             //tick += 11;
         }
 
@@ -6269,7 +6276,7 @@ namespace lh5801_Dis
             // FD handled before hand P += 1
             P += 1; // advance Program Counter
             byte value = GetByte(); // P += 1
-            disSB.AppendLine(String.Format("ANI  #(X),${0:X2}", value));
+            disSB.Append(String.Format("ANI  #(X),${0:X2}{1}", value, Environment.NewLine));
             //tick += 17;
         }
 
@@ -6284,7 +6291,7 @@ namespace lh5801_Dis
 
             // FD handled before hand P += 1
             P += 1; // advance Program Counter
-            disSB.AppendLine("STX  X");
+            disSB.Append(String.Format("STX  X{0}", Environment.NewLine));
             //tick += 11;
         }
 
@@ -6300,7 +6307,7 @@ namespace lh5801_Dis
             // FD handled before hand P += 1
             P += 1; // advance Program Counter
             byte value = GetByte();
-            disSB.AppendLine(String.Format("ORI  #(X),${0:X2}", value));
+            disSB.Append(String.Format("ORI  #(X),${0:X2}{1}", value, Environment.NewLine));
             //tick += 17;
         }
 
@@ -6315,7 +6322,7 @@ namespace lh5801_Dis
 
             // FD handled before hand P += 1
             P += 1; // advance Program Counter
-            disSB.AppendLine("OFF");
+            disSB.Append(String.Format("OFF{0}", Environment.NewLine));
             //tick += 8;
         }
 
@@ -6331,7 +6338,7 @@ namespace lh5801_Dis
             // FD handled before hand P += 1
             P += 1; // advance Program Counter
             byte value = this.GetByte(); // P += 1
-            disSB.AppendLine(String.Format("BII  #(X),${0:X2}", value));
+            disSB.Append(String.Format("BII  #(X),${0:X2}{1}", value, Environment.NewLine));
             //tick += 14;
         }
 
@@ -6346,7 +6353,7 @@ namespace lh5801_Dis
 
             // FD handled before hand P += 1
             P += 1;
-            disSB.AppendLine("STX  S");
+            disSB.Append(String.Format("STX  S{0}", Environment.NewLine));
             //tick += 11;
         }
 
@@ -6361,7 +6368,7 @@ namespace lh5801_Dis
             // FD handled before hand P += 1
             P += 1; // advance Program Counter
             byte value = GetByte(); // P += 1
-            disSB.AppendLine(String.Format("ADI  #(X),${0:X2}", value));
+            disSB.Append(String.Format("ADI  #(X),${0:X2}{1}", value, Environment.NewLine));
             //tick += 17;
         }
 
@@ -6380,7 +6387,7 @@ namespace lh5801_Dis
 
             // FD handled before hand P += 1
             P += 1; // advance Program Counter
-            disSB.AppendLine("INC  YH");
+            disSB.Append(String.Format("INC  YH{0}", Environment.NewLine));
             //tick += 9;
         }
 
@@ -6394,7 +6401,7 @@ namespace lh5801_Dis
             if (listFormat) { LineDump((ushort)(P - 1), opBytesP2[0x52]); } // dump bytes
 
             P += 1; // advance Program Counter
-            disSB.AppendLine("DEC  YH");
+            disSB.Append(String.Format("DEC  YH{0}", Environment.NewLine));
             //tick += 9;
         }
 
@@ -6409,7 +6416,7 @@ namespace lh5801_Dis
 
             // FD handled before hand P += 1
             P += 1; // advance Program Counter
-            disSB.AppendLine("LDX  P");
+            disSB.Append(String.Format("LDX  P{0}", Environment.NewLine));
             //tick += 11;
         }
 
@@ -6425,7 +6432,7 @@ namespace lh5801_Dis
             // FD handled before hand P += 1
             P += 1; // advance Program Counter
             byte value = GetByte(); // P += 1
-            disSB.AppendLine(String.Format("ANI  #(Y),${0:X2}", value));
+            disSB.Append(String.Format("ANI  #(Y),${0:X2}{1}", value, Environment.NewLine));
             //tick += 17;
         }
 
@@ -6440,7 +6447,7 @@ namespace lh5801_Dis
 
             // FD handled before hand P += 1
             P += 1; // advance Program Counter
-            disSB.AppendLine("STX  Y");
+            disSB.Append(String.Format("STX  Y{0}", Environment.NewLine));
             //tick += 11;
         }
 
@@ -6456,7 +6463,7 @@ namespace lh5801_Dis
             // FD handled before hand P += 1
             P += 1; // advance Program Counter
             byte value = GetByte();
-            disSB.AppendLine(String.Format("ORI  #(Y),${0:X2}", value));
+            disSB.Append(String.Format("ORI  #(Y),${0:X2}{1}", value, Environment.NewLine));
             //tick += 17;
         }
 
@@ -6472,7 +6479,7 @@ namespace lh5801_Dis
             // FD handled before hand P += 1
             P += 1; // advance Program Counter
             byte value = this.GetByte(); // P += 1
-            disSB.AppendLine(String.Format("BII  #(Y),${0:X2}", value));
+            disSB.Append(String.Format("BII  #(Y),${0:X2}{1}", value, Environment.NewLine));
             //tick += 14;
         }
 
@@ -6487,7 +6494,7 @@ namespace lh5801_Dis
 
             // FD handled before hand P += 1
             P += 1; // advance Program Counter
-            disSB.AppendLine("STX  P");
+            disSB.Append(String.Format("STX  P{0}", Environment.NewLine));
             //tick += 11;
         }
 
@@ -6502,7 +6509,7 @@ namespace lh5801_Dis
             // FD handled before hand P += 1
             P += 1; // advance Program Counter
             byte value = GetByte(); // P += 1
-            disSB.AppendLine(String.Format("ADI  #(Y),${0:X2}", value));
+            disSB.Append(String.Format("ADI  #(Y),${0:X2}{1}", value, Environment.NewLine));
             //tick += 17;
         }
 
@@ -6521,7 +6528,7 @@ namespace lh5801_Dis
 
             // FD handled before hand P += 1
             P += 1; // advance Program Counter
-            disSB.AppendLine("INC  UH");
+            disSB.Append(String.Format("INC  UH{0}", Environment.NewLine));
             //tick += 9;
         }
 
@@ -6536,7 +6543,7 @@ namespace lh5801_Dis
 
             // FD handled before hand P += 1
             P += 1; // advance Program Counter
-            disSB.AppendLine("DEC  UH");
+            disSB.Append(String.Format("DEC  UH{0}", Environment.NewLine));
             //tick += 9;
         }
 
@@ -6552,7 +6559,7 @@ namespace lh5801_Dis
             // FD handled before hand P += 1
             P += 1; // advance Program Counter
             byte value = GetByte(); // P += 1
-            disSB.AppendLine(String.Format("ANI  #(U),${0:X2}", value));
+            disSB.Append(String.Format("ANI  #(U),${0:X2}{1}", value, Environment.NewLine));
             //tick += 17;
         }
 
@@ -6567,7 +6574,7 @@ namespace lh5801_Dis
 
             // FD handled before hand P += 1
             P += 1; // advance Program Counter
-            disSB.AppendLine("STX  U");
+            disSB.Append(String.Format("STX  U{0}", Environment.NewLine));
             //tick += 11;
         }
 
@@ -6583,7 +6590,7 @@ namespace lh5801_Dis
             // FD handled before hand P += 1
             P += 1; // advance Program Counter
             byte value = GetByte();
-            disSB.AppendLine(String.Format("ORI  #(U),${0:X2}", value));
+            disSB.Append(String.Format("ORI  #(U),${0:X2}{1}", value, Environment.NewLine));
             //tick += 17;
         }
 
@@ -6599,7 +6606,7 @@ namespace lh5801_Dis
             // FD handled before hand P += 1
             P += 1; // advance Program Counter
             byte value = this.GetByte(); // P += 1
-            disSB.AppendLine(String.Format("BII  #(U),${0:X2}", value));
+            disSB.Append(String.Format("BII  #(U),${0:X2}{1}", value, Environment.NewLine));
             //tick += 14;
         }
 
@@ -6614,7 +6621,7 @@ namespace lh5801_Dis
             // FD handled before hand P += 1
             P += 1; // advance Program Counter
             byte value = GetByte(); // P += 1
-            disSB.AppendLine(String.Format("ADI  #(U),${0:X2}", value));
+            disSB.Append(String.Format("ADI  #(U),${0:X2}{1}", value, Environment.NewLine));
             //tick += 17;
         }
 
@@ -6633,7 +6640,7 @@ namespace lh5801_Dis
 
             // FD handled before hand P += 1
             P += 1; // advance Program Counter
-            disSB.AppendLine("INC  VH");
+            disSB.Append(String.Format("INC  VH{0}", Environment.NewLine));
             //tick += 9;
         }
 
@@ -6647,7 +6654,7 @@ namespace lh5801_Dis
             if (listFormat) { LineDump((ushort)(P - 1), opBytesP2[0x72]); } // dump bytes
 
             P += 1; // advance Program Counter
-            disSB.AppendLine("DEC  VH");
+            disSB.Append(String.Format("DEC  VH{0}", Environment.NewLine));
             //tick += 9;
         }
 
@@ -6663,7 +6670,7 @@ namespace lh5801_Dis
             // FD handled before hand P += 1
             P += 1; // advance Program Counter
             byte value = GetByte(); // P += 1
-            disSB.AppendLine(String.Format("ANI  #(V),${0:X2}", value));
+            disSB.Append(String.Format("ANI  #(V),${0:X2}{1}", value, Environment.NewLine));
             //tick += 17;
         }
 
@@ -6678,7 +6685,7 @@ namespace lh5801_Dis
 
             // FD handled before hand P += 1
             P += 1; // advance Program Counter
-            disSB.AppendLine("STX  V");
+            disSB.Append(String.Format("STX  V{0}", Environment.NewLine));
             //tick += 11;
         }
 
@@ -6694,7 +6701,7 @@ namespace lh5801_Dis
             // FD handled before hand P += 1
             P += 1; // advance Program Counter
             byte value = GetByte();
-            disSB.AppendLine(String.Format("ORI  #(V),${0:X2}", value));
+            disSB.Append(String.Format("ORI  #(V),${0:X2}{1}", value, Environment.NewLine));
             //tick += 17;
         }
 
@@ -6711,7 +6718,7 @@ namespace lh5801_Dis
             // FD handled before hand P += 1
             P += 1; // advance Program Counter
             byte value = this.GetByte(); // P += 1
-            disSB.AppendLine(String.Format("BII  #(V),${0:X2}", value));
+            disSB.Append(String.Format("BII  #(V),${0:X2}{1}", value, Environment.NewLine));
             //tick += 14;
         }
 
@@ -6726,7 +6733,7 @@ namespace lh5801_Dis
             // FD handled before hand P += 1
             P += 1; // advance Program Counter
             byte value = GetByte(); // P += 1
-            disSB.AppendLine(String.Format("ADI  #(V),${0:X2}", value));
+            disSB.Append(String.Format("ADI  #(V),${0:X2}{1}", value, Environment.NewLine));
             //tick += 17;
         }
 
@@ -6745,7 +6752,7 @@ namespace lh5801_Dis
 
             // FD handled before hand P += 1
             P += 1; // advance Program Counter
-            disSB.AppendLine("SIE");
+            disSB.Append(String.Format("SIE{0}", Environment.NewLine));
             //tick += 8;
         }
 
@@ -6760,7 +6767,7 @@ namespace lh5801_Dis
 
             // FD handled before hand P += 1
             P += 1; // advance Program Counter
-            disSB.AppendLine("PSH  X");
+            disSB.Append(String.Format("PSH  X{0}", Environment.NewLine));
             //tick += 14;
         }
 
@@ -6775,7 +6782,7 @@ namespace lh5801_Dis
 
             // FD handled before hand P += 1
             P += 1; // advance Program Counter
-            disSB.AppendLine("POP  A");
+            disSB.Append(String.Format("POP  A{0}", Environment.NewLine));
             //tick += 12;
         }
 
@@ -6790,7 +6797,7 @@ namespace lh5801_Dis
 
             // FD handled before hand P += 1
             P += 1; // advance Program Counter
-            disSB.AppendLine("DCA  #(X)");
+            disSB.Append(String.Format("DCA  #(X){0}", Environment.NewLine));
             //tick += 19;
         }
 
@@ -6805,7 +6812,7 @@ namespace lh5801_Dis
 
             // FD handled before hand P += 1
             P += 1; // advance Program Counter
-            disSB.AppendLine("CDV");
+            disSB.Append(String.Format("CDV{0}", Environment.NewLine));
             //tick += 8; 
         }
 
@@ -6824,7 +6831,7 @@ namespace lh5801_Dis
 
             // FD handled before hand P += 1
             P += 1; // advance Program Counter
-            disSB.AppendLine("PSH  Y");
+            disSB.Append(String.Format("PSH  Y{0}", Environment.NewLine));
             //tick += 14;
         }
 
@@ -6839,7 +6846,7 @@ namespace lh5801_Dis
 
             // FD handled before hand P += 1
             P += 1; // advance Program Counter
-            disSB.AppendLine("DCA  #(Y)");
+            disSB.Append(String.Format("DCA  #(Y){0}", Environment.NewLine));
             //tick += 19;
         }
 
@@ -6859,7 +6866,7 @@ namespace lh5801_Dis
             // FD handled before hand P += 1
             P += 1; // advance Program Counter
             ushort address = GetWord(); // P += 2
-            disSB.AppendLine(String.Format("SBC  #({0})", GetAddOrLabel(address)));
+            disSB.Append(String.Format("SBC  #({0}){1}", GetAddOrLabel(address), Environment.NewLine));
             //tick += 17;
         }
 
@@ -6874,7 +6881,7 @@ namespace lh5801_Dis
             // FD handled before hand P += 1
             P += 1; // advance Program Counter
             ushort address = GetWord(); // P += 2
-            disSB.AppendLine(String.Format("ADC  #({0})", GetAddOrLabel(address)));
+            disSB.Append(String.Format("ADC  #({0}){1}", GetAddOrLabel(address), Environment.NewLine));
             //tick += 17;
         }
 
@@ -6890,7 +6897,7 @@ namespace lh5801_Dis
             // FD handled before hand P += 1
             P += 1; // advance Program Counter
             ushort address = GetWord(); // P += 2
-            disSB.AppendLine(String.Format("LDA  #({0})", GetAddOrLabel(address)));
+            disSB.Append(String.Format("LDA  #({0}){1}", GetAddOrLabel(address), Environment.NewLine));
             //tick += 16;
         }
 
@@ -6906,7 +6913,7 @@ namespace lh5801_Dis
             // FD handled before hand P += 1
             P += 1; // advance Program Counter
             ushort address = GetWord(); // P += 2
-            disSB.AppendLine(String.Format("CPA  #({0})", GetAddOrLabel(address)));
+            disSB.Append(String.Format("CPA  #({0}){1}", GetAddOrLabel(address), Environment.NewLine));
             //tick += 17;
         }
 
@@ -6921,7 +6928,7 @@ namespace lh5801_Dis
 
             // FD handled before hand P += 1
             P += 1; // advance Program Counter
-            disSB.AppendLine("PSH  U");
+            disSB.Append(String.Format("PSH  U{0}", Environment.NewLine));
             //tick += 14;
         }
 
@@ -6937,7 +6944,7 @@ namespace lh5801_Dis
             // FD handled before hand P += 1
             P += 1; // advance Program Counter
             ushort address = GetWord(); // P += 2
-            disSB.AppendLine(String.Format("AND  #({0})", GetAddOrLabel(address)));
+            disSB.Append(String.Format("AND  #({0}){1}", GetAddOrLabel(address), Environment.NewLine));
             //tick += 17;
         }
 
@@ -6952,7 +6959,7 @@ namespace lh5801_Dis
 
             // FD handled before hand P += 1
             P += 1; // advance Program Counter
-            disSB.AppendLine("TTA");
+            disSB.Append(String.Format("TTA{0}", Environment.NewLine));
             //tick += 9;
         }
 
@@ -6968,7 +6975,7 @@ namespace lh5801_Dis
             // FD handled before hand P += 1
             P += 1; // advance Program Counter
             ushort address = GetWord(); // P += 2
-            disSB.AppendLine(String.Format("ORA  #({0})", GetAddOrLabel(address)));
+            disSB.Append(String.Format("ORA  #({0}){1}", GetAddOrLabel(address), Environment.NewLine));
             //tick += 17;
         }
 
@@ -6983,7 +6990,7 @@ namespace lh5801_Dis
 
             // FD handled before hand P += 1
             P += 1; // advance Program Counter
-            disSB.AppendLine("DCA  #(U)");
+            disSB.Append(String.Format("DCA  #(U){0}", Environment.NewLine));
             //tick += 19;
         }
 
@@ -6999,7 +7006,7 @@ namespace lh5801_Dis
             // FD handled before hand P += 1
             P += 1; // advance Program Counter
             ushort address = GetWord(); // P += 2;
-            disSB.AppendLine(String.Format("EOR  #({0})", GetAddOrLabel(address)));
+            disSB.Append(String.Format("EOR  #({0}){1}", GetAddOrLabel(address), Environment.NewLine));
             //tick += 11;
         }
 
@@ -7015,7 +7022,7 @@ namespace lh5801_Dis
             // FD handled before hand P += 1
             P += 1; // advance Program Counter
             ushort address = GetWord(); // P += 2
-            disSB.AppendLine(String.Format("STA  #({0})", GetAddOrLabel(address)));
+            disSB.Append(String.Format("STA  #({0}){1}", GetAddOrLabel(address), Environment.NewLine));
             //tick += 16;
         }
 
@@ -7031,7 +7038,7 @@ namespace lh5801_Dis
             // FD handled before hand P += 1
             P += 1; // advance Program Counter
             ushort address = GetWord(); // P += 2
-            disSB.AppendLine(String.Format("BIT  #({0})", GetAddOrLabel(address)));
+            disSB.Append(String.Format("BIT  #({0}){1}", GetAddOrLabel(address), Environment.NewLine));
             //tick += 17;
         }
 
@@ -7050,7 +7057,7 @@ namespace lh5801_Dis
 
             // FD handled before hand P += 1
             P += 1; // advance Program Counter
-            disSB.AppendLine("HLT");
+            disSB.Append(String.Format("HLT{0}", Environment.NewLine));
             //tick += 9;
         }
 
@@ -7065,7 +7072,7 @@ namespace lh5801_Dis
 
             // FD handled before hand P += 1
             P += 1; // advance Program Counter
-            disSB.AppendLine("PSH  V");
+            disSB.Append(String.Format("PSH  V{0}", Environment.NewLine));
             //tick += 14;
         }
 
@@ -7080,7 +7087,7 @@ namespace lh5801_Dis
 
             // FD handled before hand P += 1
             P += 1; // advance Program Counter
-            disSB.AppendLine("ITA");
+            disSB.Append(String.Format("ITA{0}", Environment.NewLine));
             tick += 9;
         }
 
@@ -7095,7 +7102,7 @@ namespace lh5801_Dis
 
             // FD handled before hand P += 1
             P += 1; // advance Program Counter
-            disSB.AppendLine("DCA  #(V)");
+            disSB.Append(String.Format("DCA  #(V){0}", Environment.NewLine));
             //tick += 19;
         }
 
@@ -7110,7 +7117,7 @@ namespace lh5801_Dis
 
             // FD handled before hand P += 1
             P += 1; // advance Program Counter
-            disSB.AppendLine("RIE");
+            disSB.Append(String.Format("RIE{0}", Environment.NewLine));
             //tick += 8;
         }
 
@@ -7129,7 +7136,7 @@ namespace lh5801_Dis
 
             // FD handled before hand P += 1
             P += 1; // advance Program Counter
-            disSB.AppendLine("RDP");
+            disSB.Append(String.Format("RDP{0}", Environment.NewLine));
             //tick += 8;
         }
 
@@ -7144,7 +7151,7 @@ namespace lh5801_Dis
 
             // FD handled before hand P += 1
             P += 1; // advance Program Counter
-            disSB.AppendLine("SDP");
+            disSB.Append(String.Format("SDP{0}", Environment.NewLine));
             //tick += 9;
         }
 
@@ -7159,7 +7166,7 @@ namespace lh5801_Dis
 
             // FD handled before hand P += 1
             P += 1; // advance Program Counter
-            disSB.AppendLine("PSH  A");
+            disSB.Append(String.Format("PSH  A{0}", Environment.NewLine));
             //tick += 11;
         }
 
@@ -7173,7 +7180,7 @@ namespace lh5801_Dis
             if (listFormat) { LineDump((ushort)(P - 1), opBytesP2[0xCA]); } // dump bytes
 
             P += 1; // advance Program Counter
-            disSB.AppendLine("ADR  X");
+            disSB.Append(String.Format("ADR  X{0}", Environment.NewLine));
             //tick += 11;
         }
 
@@ -7188,7 +7195,7 @@ namespace lh5801_Dis
 
             // FD handled before hand P += 1
             P += 1; // advance Program Counter
-            disSB.AppendLine("ATP");
+            disSB.Append(String.Format("ATP{0}", Environment.NewLine));
             //tick += 9;
         }
 
@@ -7203,7 +7210,7 @@ namespace lh5801_Dis
 
             // FD handled before hand P += 1
             P += 1; // advance Program Counter
-            disSB.AppendLine("AM0");
+            disSB.Append(String.Format("AM0{0}", Environment.NewLine));
             //tick += 9;
         }
 
@@ -7223,7 +7230,7 @@ namespace lh5801_Dis
 
             // FD handled before hand P += 1
             P += 1; // advance Program Counter
-            disSB.AppendLine("DRR  #(X)");
+            disSB.Append(String.Format("DRR  #(X){0}", Environment.NewLine));
             //tick += 16;
         }
 
@@ -7239,7 +7246,7 @@ namespace lh5801_Dis
 
             // FD handled before hand P += 1
             P += 1; // advance Program Counter
-            disSB.AppendLine("DRL  #(X)");
+            disSB.Append(String.Format("DRL  #(X){0}", Environment.NewLine));
             //tick += 16;
         }
 
@@ -7254,7 +7261,7 @@ namespace lh5801_Dis
 
             // FD handled before hand P += 1
             P += 1; // advance Program Counter
-            disSB.AppendLine("ADR  Y");
+            disSB.Append(String.Format("ADR  Y{0}", Environment.NewLine));
             //tick += 11;
         }
 
@@ -7269,7 +7276,7 @@ namespace lh5801_Dis
 
             // FD handled before hand P += 1
             P += 1; // advance Program Counter
-            disSB.AppendLine("AM1");
+            disSB.Append(String.Format("AM1{0}", Environment.NewLine));
             //tick += 9;
         }
 
@@ -7290,7 +7297,7 @@ namespace lh5801_Dis
             P += 1; // advance Program Counter
             ushort address = GetWord(); // P += 2
             byte value = GetByte();     // P += 1
-            disSB.AppendLine(String.Format("ANI  #({0}),${1:X2}", GetAddOrLabel(address), value));
+            disSB.Append(String.Format("ANI  #({0}),${1:X2}{2}", GetAddOrLabel(address), value, Environment.NewLine));
             //tick += 23;
         }
 
@@ -7305,7 +7312,7 @@ namespace lh5801_Dis
 
             // FD handled before hand P += 1
             P += 1; // advance Program Counter
-            disSB.AppendLine("ADR  U");
+            disSB.Append(String.Format("ADR  U{0}", Environment.NewLine));
             //tick += 11;
         }
 
@@ -7322,7 +7329,7 @@ namespace lh5801_Dis
             P += 1; // advance Program Counter
             ushort address = GetWord(); // P += 2
             byte value = GetByte();     // P += 1
-            disSB.AppendLine(String.Format("ORI  #({0}),${1:X2}", GetAddOrLabel(address), value));
+            disSB.Append(String.Format("ORI  #({0}),${1:X2}{2}", GetAddOrLabel(address), value, Environment.NewLine));
             //tick += 23;
         }
 
@@ -7337,7 +7344,7 @@ namespace lh5801_Dis
 
             // FD handled before hand P += 1
             P += 1; // advance Program Counter
-            disSB.AppendLine("ATT");
+            disSB.Append(String.Format("ATT{0}", Environment.NewLine));
             //tick += 9;
         }
 
@@ -7354,7 +7361,7 @@ namespace lh5801_Dis
             P += 1; // advance Program Counter
             ushort address = GetWord(); // P += 2
             byte value = GetByte();     // P += 1
-            disSB.AppendLine(String.Format("BII  #({0}),${1:X2}", GetAddOrLabel(address), value));
+            disSB.Append(String.Format("BII  #({0}),${1:X2}{2}", GetAddOrLabel(address), value, Environment.NewLine));
             //tick += 20;
         }
 
@@ -7370,7 +7377,7 @@ namespace lh5801_Dis
             P += 1; // advance Program Counter
             ushort address = GetWord(); // P += 2
             byte value = GetByte();     // P += 1
-            disSB.AppendLine(String.Format("ADI  #({0}),${1:X2}", GetAddOrLabel(address), value));
+            disSB.Append(String.Format("ADI  #({0}),${1:X2}{2}", GetAddOrLabel(address), value, Environment.NewLine));
             //tick += 23;
         }
 
@@ -7388,7 +7395,7 @@ namespace lh5801_Dis
             if (listFormat) { LineDump((ushort)(P - 1), opBytesP2[0xFA]); } // dump bytes
 
             P += 1; // advance Program Counter
-            disSB.AppendLine("ADR  V");
+            disSB.Append(String.Format("ADR  V{0}", Environment.NewLine));
             //tick += 11;
         }
 
