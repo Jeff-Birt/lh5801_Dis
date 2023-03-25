@@ -1,7 +1,8 @@
 Todo list:
 
-1) Output to a file instead/in addition to the form
-2) Add in ability to handle BASIC_TABLE segment
+1) Add in ability to handle BASIC_TABLE segment
+2) Handle #include in lib file, only 1 level for now
+
 
 Misc:
 

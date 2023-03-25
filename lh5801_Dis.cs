@@ -4,10 +4,10 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using System.IO;
+using ExtensionMethods;
 
 namespace lh5801_Dis
 {
-
     public class lh5801_Dis
     {
         /// <summary>
@@ -21,53 +21,180 @@ namespace lh5801_Dis
             WORD,
             CODE,
             TEXT,
+            RESERVE,
+            BASTBL,
             SKIP
         }
 
+        /// <summary>
+        /// A LABLE is a named address in memory.
+        /// LABLE.name is name of address, LABLE.size is number of bytes reserved.
+        /// For example 1K of RAM as a buffer starting at address $1000:
+        /// Buffer = $1000
+        /// Buffer_Size = $400
+        /// </summary>
+        struct LABEL
+        {
+            public string name; // label name
+            public ushort size; // size is zero based
+
+            public LABEL(string name, ushort size)
+            {
+                this.name = name;
+                this.size = size;
+            }
+        }
+
+        struct SPAN
+        {
+            public int start; // starting index in array
+            public int end;   // ending index in array
+
+            public SPAN(int start, int end)
+            {
+                this.start = start;
+                this.end = end;
+            }
+        }
+
+        /// <summary>
+        /// ArgIndex - Vector index, to address, to argument types
+        /// Argument types: 0=none; 1=ABYT Arg is LB of $78xx address; 2=ABRF; 3=ABYT,ABRF
+        ///                 4=ABRF,ABYT; 5=ABYT,ABYT; 6=ACHR or AWRD (if first byte > $E0), ABRF     
+        ///                 7=ABYT,ABYT,ABRF; 8= ABYT(#arg pairs), ABYT \ ABRF (arg pairs)
+        ///                 9=ABYT; 10=AWRD
+        /// </summary>
+        int[,] ArgIndex = new int[132, 3] { { 0x00,0xDCB7,0x07 }, { 0x02,0xDCB6,0x07 }, { 0x04,0xDCC6,0x02 }, { 0x06,0xD065,0x00 },
+                                            { 0x08,0xDDD9,0x02 }, { 0x0A,0xDE5E,0x00 }, { 0x0C,0xDE97,0x00 }, { 0x0E,0xD461,0x03 },
+                                            { 0x10,0xDD2D,0x01 }, { 0x12,0xDF93,0x00 }, { 0x14,0xDFFA,0x00 }, { 0x16,0xDFF5,0x00 },
+                                            { 0x18,0xDF80,0x00 }, { 0x1A,0xD2E6,0x02 }, { 0x1C,0xFA89,0x01 }, { 0x1E,0xFB2A,0x00 },
+                                            { 0x20,0xDF72,0x00 }, { 0x22,0xDF63,0x00 }, { 0x24,0xDEAF,0x00 }, { 0x26,0xDB87,0x00 },
+                                            { 0x28,0xDBB1,0x02 }, { 0x2A,0xD03E,0x05 }, { 0x2C,0xDCA6,0x01 }, { 0x2E,0xD6C0,0x01 },
+                                            { 0x30,0xDC16,0x00 }, { 0x32,0xD071,0x00 }, { 0x34,0xDF23,0x08 }, { 0x36,0xDF0F,0x00 },
+                                            { 0x38,0xCE9F,0x00 }, { 0x3A,0xCFFB,0x00 }, { 0x3C,0xFA74,0x00 }, { 0x3E,0xFB2A,0x00 },
+                                            { 0x40,0xC401,0x00 }, { 0x42,0xCA58,0x00 }, { 0x44,0xCA7A,0x00 }, { 0x46,0xCA80,0x00 },
+                                            { 0x48,0xDC49,0x00 }, { 0x4A,0xDCFD,0x00 }, { 0x4C,0xDCE9,0x00 }, { 0x4E,0xDCED,0x00 },
+                                            { 0x50,0xDA71,0x00 }, { 0x52,0xF663,0x00 }, { 0x54,0xF7B0,0x00 }, { 0x56,0xF73D,0x00 },
+                                            { 0x58,0xF084,0x00 }, { 0x5A,0xE573,0x00 }, { 0x5C,0xF61B,0x00 }, { 0x5E,0xF7A7,0x00 },
+                                            { 0x60,0xF6B4,0x00 }, { 0x62,0xF88B,0x00 }, { 0x64,0xF7B5,0x00 }, { 0x66,0xF7B9,0x00 },
+                                            { 0x68,0xF715,0x00 }, { 0x6A,0xF88F,0x00 }, { 0x6C,0xF6FB,0x00 }, { 0x6E,0xF080,0x00 },
+                                            { 0x70,0xF747,0x00 }, { 0x72,0xF7CE,0x00 }, { 0x74,0xF775,0x00 }, { 0x76,0xF75F,0x00 },
+                                            { 0x78,0xF72F,0x00 }, { 0x7A,0xF7DD,0x00 }, { 0x7C,0xF6E6,0x00 }, { 0x7E,0xF01A,0x00 },
+                                            { 0x80,0xF707,0x00 }, { 0x82,0xF729,0x00 }, { 0x84,0xEF00,0x00 }, { 0x86,0xEB40,0x00 },
+                                            { 0x88,0xEDF6,0x00 }, { 0x8A,0xED5B,0x00 }, { 0x8C,0xEE1F,0x00 }, { 0x8E,0xEDB1,0x00 },
+                                            { 0x90,0xEDAB,0x00 }, { 0x92,0xED00,0x00 }, { 0x94,0xEC5C,0x00 }, { 0x96,0xEA78,0x00 },
+                                            { 0x98,0xEC74,0x00 }, { 0x9A,0xECEB,0x00 }, { 0x9C,0xECB7,0x00 }, { 0x9E,0xE4A0,0x00 },
+                                            { 0xA0,0xE234,0x00 }, { 0xA2,0xE655,0x00 }, { 0xA4,0xB888,0x00 }, { 0xA6,0xE451,0x00 },
+                                            { 0xA8,0xB88B,0x00 }, { 0xAA,0xB88E,0x00 }, { 0xAC,0xE88C,0x00 }, { 0xAE,0xB891,0x00 },
+                                            { 0xB0,0xB894,0x00 }, { 0xB2,0xB897,0x00 }, { 0xB4,0xB89A,0x00 }, { 0xB6,0xB89D,0x00 },
+                                            { 0xB8,0xB8A0,0x00 }, { 0xBA,0xF763,0x00 }, { 0xBC,0xE487,0x00 }, { 0xBE,0xE4A8,0x00 },
+                                            { 0xC0,0xDD08,0x00 }, { 0xC2,0xDCD4,0x06 }, { 0xC4,0xDCD5,0x06 }, { 0xC6,0xDD13,0x00 },
+                                            { 0xC8,0xDCC5,0x02 }, { 0xCA,0xC001,0x01 }, { 0xCC,0xDDC8,0x01 }, { 0xCE,0xD45D,0x03 },
+                                            { 0xD0,0xD5F9,0x03 }, { 0xD2,0xDD1A,0x04 }, { 0xD4,0xDEE3,0x01 }, { 0xD6,0xDED1,0x01 },
+                                            { 0xD8,0xDF3B,0x00 }, { 0xDA,0xC00E,0x00 }, { 0xDC,0xDEBC,0x00 }, { 0xDE,0xD6DF,0x02 },
+                                            { 0xE0,0xCD8B,0x00 }, { 0xE2,0xC400,0x00 }, { 0xE4,0xCD89,0x00 }, { 0xE6,0xF70D,0x00 },
+                                            { 0xE8,0xF661,0x00 }, { 0xEA,0xF79C,0x00 }, { 0xEC,0xF757,0x00 }, { 0xEE,0xF7CC,0x00 },
+                                            { 0xF0,0xEFBA,0x00 }, { 0xF2,0xEE71,0x00 }, { 0xF4,0xDBBC,0x03 }, { 0xF6,0xDDB5,0x03 },
+                                            { 0xF8,0xE171,0x00 }, { 0xFA,0xE22C,0x00 }, { 0xFC,0xE22B,0x00 }, { 0xFE,0xE000,0x00 },
+                                            { 0x04,0xD14F,0x02 }, { 0x04,0xDFA1,0x02 }, { 0x04,0xD2EA,0x02 }, { 0x04,0xD2EC,0x02 } };
+
+
         #region evil_globals
 
+        System.Windows.Forms.TextBox tbStatus;      // Status TB on Form1
+        int includeLevel = 0;                       // need to track how many level deep in includes
         private SEGMENT SegmentMode = SEGMENT.CODE; // default to CODE mode
         private ushort SegmentEnd = 0x0000;         // last address of current SegmentMode
+        private int SegmentLastIndex = 0;           // index of last segment used in dictionary
         Dictionary<ushort, SEGMENT> SegmentDict;    // Holds address/FRAG type pairs
         Dictionary<ushort, string> CommentDict;     // Holds address/comment pairs
 
-        public bool listFormat = true;      // output in list format "Address hex_val disassembled" 
-        public bool disModePC1500 = true;   // disassemble VEJ commands as used on PC-1500
-        public bool addressLabels = true;   // display address labels
-        public bool libFileEnable = true;   // enable using 'LIB' file to describe binary structure
+        public bool listFormat    = true;           // output in list format "Address hex_val disassembled" 
+        public bool disModePC1500 = false;          // disassemble VEJ commands as used on PC-1500
+        public bool addressLabels = false;          // display address labels
+        public bool libFileEnable = false;          // enable using 'LIB' file to describe binary structure
+        public bool outputFile    = true;           // output a text file for disassembly
 
-        public uint tick = 0;   // number of processor clock cyclces
-        public ushort P = 0;    // Program Counter
+        public uint tick = 0;                       // number of processor clock cyclces
+        public ushort P = 0;                        // Program Counter
         public byte[] RAM_ME0 = new byte[0xFFFF + 0x01];
         public byte[] RAM_ME1 = new byte[0xFFFF + 0x01];
 
-        private byte[] opBytesP1; // Index of opcode to #bytes used for Page 1
-        private byte[] opBytesP2; // Index of opcode to #bytes used for Page 2
-        private byte[] vecArgs;   // Index to #arg bytes for $FF page vectors 
+        private byte[] opBytesP1;                   // Index of opcode to #bytes used for Page 1
+        private byte[] opBytesP2;                   // Index of opcode to #bytes used for Page 2
+        private byte[] vecArgs;                     // Index to #arg bytes for $FF page vectors 
 
         List<Delegate> delegatesTbl1 = new List<Delegate>();    // delegates (function pointers) for page 1 opcodes
         List<Delegate> delegatesTbl2 = new List<Delegate>();    // delegates (function pointers) for page 2 opcodes
         List<Delegate> delegatesVect = new List<Delegate>();    // delegates (function pointers) for vector (FF page) handlers
-        StringBuilder disSB = new StringBuilder();              // evil global string builder used in disassembly
-        Dictionary<ushort, string> lableDict;                   // holds address, lable text pairs used in disassembly
+        StringBuilder disSB = new StringBuilder();              // evil global string builder used in disassembly               
+        SortedList<ushort, LABEL> labelDict;                    // holds address, lable text pairs used in disassembly
+        ushort lastAddedKey = 0;                                // hack to save index of last entry in labelDict
 
+        // can probably just save the string and not the whole RegEx object
         System.Text.RegularExpressions.Regex isLabel     = new System.Text.RegularExpressions.Regex("^[a-zA-Z0-9_-]*$");
         System.Text.RegularExpressions.Regex isDirective = new System.Text.RegularExpressions.Regex("^.[a-zA-Z0-9_-]*$");
         System.Text.RegularExpressions.Regex isHexVal    = new System.Text.RegularExpressions.Regex("^0[xX]?|[$]?[0-9a-fA-F]+[H]?$");
         System.Text.RegularExpressions.Regex isEqu       = new System.Text.RegularExpressions.Regex("^[.]?equ$|^=$");
         System.Text.RegularExpressions.Regex isComment   = new System.Text.RegularExpressions.Regex("^[;]");
+        System.Text.RegularExpressions.Regex isInclude   = new System.Text.RegularExpressions.Regex("#include \\s*((<[^>]+>)|(\"[^\"]+\"))");
+        System.Text.RegularExpressions.Regex getIncFile  = new System.Text.RegularExpressions.Regex("(?<=[<\"])(.*?)(?=[>\"])");
+
+        private String FilePath = ""; // path of bin file, other file names/extensions derived form this
+
+        Dictionary<ushort, string> BASIC_Keywords = new Dictionary<ushort, string>()
+        {
+            {0xF170,"ABS"}, {0xF174,"ACS"}, {0xF150,"AND"}, {0xF180,"AREAD"}, {0xF181,"ARUN"}, {0xF160,"ASC"}, {0xF173,"ASN"}, {0xF175,"ATN"},
+            {0xF182,"BEEP"}, {0xF0B3,"BREAK"},
+            {0xF18A,"CALL"}, {0xF0B2,"CHAIN"}, {0xF163,"CHR$"}, {0xF187,"CLEAR"}, {0xF089,"CLOAD"}, {0xF088,"CLS"}, {0xE858,"COM$"}, {0xF0B1,"CONSOLE"},
+            {0xF183,"CONT"}, {0xF0B5,"COLOR"}, {0xF17E,"COS"}, {0xF095,"CSAVE"}, {0xE680,"CSIZE"}, {0xF084,"CURSOR"},
+            {0xF18D,"DATA"}, {0xF165,"DEG"}, {0xF18C,"DEGREE"}, {0xE857,"DEV$"}, {0xF185,"DIM"}, {0xF166,"DMS"}, {0xE884,"DTE"},
+            {0xF18E,"END"}, {0xF053,"ERL"}, {0xF052,"ERN"}, {0xF1B4,"ERROR"}, {0xF178,"EXP"},
+            {0xF0B0,"FEED"}, {0xF1A5,"FOR"},
+            {0xF093,"GCURSOR"}, {0xE682,"GLCURSOR"}, {0xF194,"GOSUB"}, {0xF192,"GOTO"}, {0xFD9F,"GPRINT"}, {0xF186,"GRAD"}, {0xE681,"GRAPH"},
+            {0xF196,"IF"}, {0xF15C,"INKY$"}, {0xF091,"INPUT"}, {0xE859,"INSTAT"}, {0xF171,"INT"},
+            {0xE683,"LCURSOR"}, {0xF17A,"LEFT$"}, {0xF164,"LEN"}, {0xF198,"LET"}, {0xF0B6,"LF"}, {0xF0B7,"LINE"}, {0xF090,"LIST"}, {0xF0B8,"LLIST"},
+            {0xF176,"LN"}, {0xF1B5,"LOCK"}, {0xF177,"LOG"}, {0xF0B9,"LPRINT"},
+            {0xF158,"MEM"}, {0xF08F,"MERGE"}, {0xF17B,"MID$"},
+            {0xF19B,"NEW"}, {0xF19A,"NEXT"}, {0xF16D,"NOT"},
+            {0xF19E,"OFF"}, {0xF19C,"ON"}, {0xF19D,"OPN"}, {0xF151,"OR"}, {0xE880,"OUTSTAT"},
+            {0xF1A2,"PAUSE"}, {0xF16F,"PEEK"}, {0xF16E,"LPEEK#"}, {0xF15D,"PI"}, {0xF168,"POINT"}, {0xF1A1,"POKE"}, {0xF1A0,"POKE#"}, {0xF097,"PRINT"},
+            {0xF1AA,"RADIAN"}, {0xF1A8,"RANSOM"}, {0xF1A6,"READ"}, {0xF1AB,"REM"}, {0xF1A7,"RESTORE"}, {0xF199,"RETURN"}, {0xF172,"RIGHT$"}, {0xE85A,"RINKY$"},
+            {0xF0BA,"RLINE"}, {0xE7A9,"RMT"}, {0xF17C,"RND"}, {0xE685,"ROTATE"}, {0xF1A4,"RUN"},
+            {0xE882,"SETCOM"}, {0xE886,"SETDEV"}, {0xF179,"SGN"}, {0xF17D,"SIN"}, {0xE684,"SQRGN"}, {0xF061,"SPACE$"}, {0xF16B,"SQR"}, {0xF167,"STATUS"},
+            {0xF1AD,"STEP"}, {0xF1AC,"STOP"}, {0xF161,"STR$"},
+            {0xF0BB,"TAB"}, {0xF17F,"TAN"}, {0xE883,"TERMINAL"}, {0xF0BC,"TEST"}, {0xE686,"TEXT"}, {0xF1AE,"THEN"}, {0xF15B,"TIME"}, {0xF1B1,"TO"},
+            {0xE885,"TRANSMIT"}, {0xF1B0,"TROFF"}, {0xF1AF,"TRON"},
+            {0xF1B6,"UNLOCK"}, {0xF085,"USING"},
+            {0xF162,"VAL"},
+            {0xF1B3,"WAIT"},
+            {0xF0B4,"ZONE"}
+        };
+
 
         #endregion evil_globals
 
         /// <summary>
         /// The constructonator
         /// </summary>
+        public lh5801_Dis(System.Windows.Forms.TextBox status)
+        {
+            Reset();
+            ConfigDelegates();
+            ConfigOpcodeBytesTables();
+
+            tbStatus = status;
+            tbStatus.Text += "This is text from CPU class" + Environment.NewLine;
+        }
+
+        /// <summary>
+        /// The constructonator without TextBox reference for UNit Testing
+        /// </summary>
         public lh5801_Dis()
         {
             Reset();
             ConfigDelegates();
             ConfigOpcodeBytesTables();
-            ReadLibFile();
         }
 
         #region Configuration 
@@ -716,81 +843,81 @@ namespace lh5801_Dis
 
             #region 0xFF00-0xFF3E
 
-            delegatesVect.Add((Func<Byte, Tuple<String, byte>>)VEJ_b1_b2_o1);  // 00
-            delegatesVect.Add((Func<Byte, Tuple<String, byte>>)VEJ_b1_b2_o1);  // 02
-            delegatesVect.Add((Func<Byte, Tuple<String, byte>>)VEJ_o1);        // 04
-            delegatesVect.Add((Func<Byte, Tuple<String, byte>>)VEJ_Default);   // 06 n/a
-            delegatesVect.Add((Func<Byte, Tuple<String, byte>>)VEJ_o1);        // 08
-            delegatesVect.Add((Func<Byte, Tuple<String, byte>>)VEJ_Default);   // 0A n/a
-            delegatesVect.Add((Func<Byte, Tuple<String, byte>>)VEJ_Default);   // 0C n/a
-            delegatesVect.Add((Func<Byte, Tuple<String, byte>>)VEJ_b1_o1);     // 0E
+            delegatesVect.Add((Func<string>)VECARG_T7);     // 00
+            delegatesVect.Add((Func<string>)VECARG_T7);     // 02
+            delegatesVect.Add((Func<string>)VECARG_T2);     // 04
+            delegatesVect.Add((Func<string>)VECARG_T0);     // 06 n/a
+            delegatesVect.Add((Func<string>)VECARG_T2);     // 08
+            delegatesVect.Add((Func<string>)VECARG_T0);     // 0A n/a
+            delegatesVect.Add((Func<string>)VECARG_T0);     // 0C n/a
+            delegatesVect.Add((Func<string>)VECARG_T3);     // 0E
 
-            delegatesVect.Add((Func<Byte, Tuple<String, byte>>)VEJ_b1);        // 10
-            delegatesVect.Add((Func<Byte, Tuple<String, byte>>)VEJ_Default);   // 12 n/a
-            delegatesVect.Add((Func<Byte, Tuple<String, byte>>)VEJ_Default);   // 14 n/a
-            delegatesVect.Add((Func<Byte, Tuple<String, byte>>)VEJ_Default);   // 16 n/a
-            delegatesVect.Add((Func<Byte, Tuple<String, byte>>)VEJ_Default);   // 18 n/a
-            delegatesVect.Add((Func<Byte, Tuple<String, byte>>)VEJ_o1);        // 1A
-            delegatesVect.Add((Func<Byte, Tuple<String, byte>>)VEJ_b1);        // 1C
-            delegatesVect.Add((Func<Byte, Tuple<String, byte>>)VEJ_Default);   // 1E n/a
+            delegatesVect.Add((Func<string>)VECARG_T9);     // 10
+            delegatesVect.Add((Func<string>)VECARG_T0);     // 12 n/a
+            delegatesVect.Add((Func<string>)VECARG_T0);     // 14 n/a
+            delegatesVect.Add((Func<string>)VECARG_T0);     // 16 n/a
+            delegatesVect.Add((Func<string>)VECARG_T0);     // 18 n/a
+            delegatesVect.Add((Func<string>)VECARG_T2);     // 1A
+            delegatesVect.Add((Func<string>)VECARG_T9);     // 1C
+            delegatesVect.Add((Func<string>)VECARG_T0);     // 1E n/a
 
-            delegatesVect.Add((Func<Byte, Tuple<String, byte>>)VEJ_Default);   // 20 n/a
-            delegatesVect.Add((Func<Byte, Tuple<String, byte>>)VEJ_Default);   // 22 n/a
-            delegatesVect.Add((Func<Byte, Tuple<String, byte>>)VEJ_Default);   // 24 n/a
-            delegatesVect.Add((Func<Byte, Tuple<String, byte>>)VEJ_Default);   // 26 n/a
-            delegatesVect.Add((Func<Byte, Tuple<String, byte>>)VEJ_o1);        // 28
-            delegatesVect.Add((Func<Byte, Tuple<String, byte>>)VEJ_b1_b2);     // 2A
-            delegatesVect.Add((Func<Byte, Tuple<String, byte>>)VEJ_78b1);      // 2C
-            delegatesVect.Add((Func<Byte, Tuple<String, byte>>)VEJ_78b1);      // 2E
+            delegatesVect.Add((Func<string>)VECARG_T0);     // 20 n/a
+            delegatesVect.Add((Func<string>)VECARG_T0);     // 22 n/a
+            delegatesVect.Add((Func<string>)VECARG_T0);     // 24 n/a
+            delegatesVect.Add((Func<string>)VECARG_T0);     // 26 n/a
+            delegatesVect.Add((Func<string>)VECARG_T2);     // 28
+            delegatesVect.Add((Func<string>)VECARG_T5);     // 2A
+            delegatesVect.Add((Func<string>)VECARG_T2);     // 2C
+            delegatesVect.Add((Func<string>)VECARG_T2);     // 2E
 
-            delegatesVect.Add((Func<Byte, Tuple<String, byte>>)VEJ_Default);   // 30 n/a
-            delegatesVect.Add((Func<Byte, Tuple<String, byte>>)VEJ_Default);   // 32 n/a
-            delegatesVect.Add((Func<Byte, Tuple<String, byte>>)VEJ_b1_nb2o1);  // 34 
-            delegatesVect.Add((Func<Byte, Tuple<String, byte>>)VEJ_Default);   // 36 n/a
-            delegatesVect.Add((Func<Byte, Tuple<String, byte>>)VEJ_Default);   // 38 n/a
-            delegatesVect.Add((Func<Byte, Tuple<String, byte>>)VEJ_Default);   // 3A n/a
-            delegatesVect.Add((Func<Byte, Tuple<String, byte>>)VEJ_Default);   // 3C n/a
-            delegatesVect.Add((Func<Byte, Tuple<String, byte>>)VEJ_Default);   // 3E n/a
+            delegatesVect.Add((Func<string>)VECARG_T0);     // 30 n/a
+            delegatesVect.Add((Func<string>)VECARG_T0);     // 32 n/a
+            delegatesVect.Add((Func<string>)VECARG_T8);     // 34 
+            delegatesVect.Add((Func<string>)VECARG_T0);     // 36 n/a
+            delegatesVect.Add((Func<string>)VECARG_T0);     // 38 n/a
+            delegatesVect.Add((Func<string>)VECARG_T0);     // 3A n/a
+            delegatesVect.Add((Func<string>)VECARG_T0);     // 3C n/a
+            delegatesVect.Add((Func<string>)VECARG_T0);     // 3E n/a
 
             #endregion 0xFF00-0xFF3E
 
             #region 0xFFC0-0xFFFE
 
-            delegatesVect.Add((Func<Byte, Tuple<String, byte>>)VEJ_Default); // C0 n/a
-            delegatesVect.Add((Func<Byte, Tuple<String, byte>>)VEJ_p_o1);    // C2
-            delegatesVect.Add((Func<Byte, Tuple<String, byte>>)VEJ_p_o1);    // C4
-            delegatesVect.Add((Func<Byte, Tuple<String, byte>>)VEJ_Default); // C6 n/a
-            delegatesVect.Add((Func<Byte, Tuple<String, byte>>)VEJ_o1);      // C8
-            delegatesVect.Add((Func<Byte, Tuple<String, byte>>)VEJ_78b1);    // CA 
-            delegatesVect.Add((Func<Byte, Tuple<String, byte>>)VEJ_78b1);    // CC 
-            delegatesVect.Add((Func<Byte, Tuple<String, byte>>)VEJ_b1_o1);   // CE
+            delegatesVect.Add((Func<string>)VECARG_T0);     // C0 n/a
+            delegatesVect.Add((Func<string>)VECARG_T6);     // C2
+            delegatesVect.Add((Func<string>)VECARG_T6);     // C4
+            delegatesVect.Add((Func<string>)VECARG_T0);     // C6 n/a
+            delegatesVect.Add((Func<string>)VECARG_T2);     // C8
+            delegatesVect.Add((Func<string>)VECARG_T1);     // CA 
+            delegatesVect.Add((Func<string>)VECARG_T1);     // CC 
+            delegatesVect.Add((Func<string>)VECARG_T3);     // CE
 
-            delegatesVect.Add((Func<Byte, Tuple<String, byte>>)VEJ_b1_o1);   // D0 
-            delegatesVect.Add((Func<Byte, Tuple<String, byte>>)VEJ_b1_b2);   // D2
-            delegatesVect.Add((Func<Byte, Tuple<String, byte>>)VEJ_b1);      // D4
-            delegatesVect.Add((Func<Byte, Tuple<String, byte>>)VEJ_b1);      // D6 
-            delegatesVect.Add((Func<Byte, Tuple<String, byte>>)VEJ_Default); // D8 n/a
-            delegatesVect.Add((Func<Byte, Tuple<String, byte>>)VEJ_Default); // DA n/a
-            delegatesVect.Add((Func<Byte, Tuple<String, byte>>)VEJ_Default); // DC n/a
-            delegatesVect.Add((Func<Byte, Tuple<String, byte>>)VEJ_o1);      // DE
+            delegatesVect.Add((Func<string>)VECARG_T3);     // D0 
+            delegatesVect.Add((Func<string>)VECARG_T4);     // D2
+            delegatesVect.Add((Func<string>)VECARG_T9);     // D4
+            delegatesVect.Add((Func<string>)VECARG_T9);     // D6 
+            delegatesVect.Add((Func<string>)VECARG_T0);     // D8 n/a
+            delegatesVect.Add((Func<string>)VECARG_T0);     // DA n/a
+            delegatesVect.Add((Func<string>)VECARG_T0);     // DC n/a
+            delegatesVect.Add((Func<string>)VECARG_T2);     // DE
 
-            delegatesVect.Add((Func<Byte, Tuple<String, byte>>)VEJ_Default); // E0 n/a
-            delegatesVect.Add((Func<Byte, Tuple<String, byte>>)VEJ_Default); // E2 n/a
-            delegatesVect.Add((Func<Byte, Tuple<String, byte>>)VEJ_Default); // E4 n/a
-            delegatesVect.Add((Func<Byte, Tuple<String, byte>>)VEJ_Default); // E6 n/a
-            delegatesVect.Add((Func<Byte, Tuple<String, byte>>)VEJ_Default); // E8 n/a
-            delegatesVect.Add((Func<Byte, Tuple<String, byte>>)VEJ_Default); // EA n/a
-            delegatesVect.Add((Func<Byte, Tuple<String, byte>>)VEJ_Default); // EC n/a
-            delegatesVect.Add((Func<Byte, Tuple<String, byte>>)VEJ_Default); // EE n/a
+            delegatesVect.Add((Func<string>)VECARG_T0);     // E0 n/a
+            delegatesVect.Add((Func<string>)VECARG_T0);     // E2 n/a
+            delegatesVect.Add((Func<string>)VECARG_T0);     // E4 n/a
+            delegatesVect.Add((Func<string>)VECARG_T0);     // E6 n/a
+            delegatesVect.Add((Func<string>)VECARG_T0);     // E8 n/a
+            delegatesVect.Add((Func<string>)VECARG_T0);     // EA n/a
+            delegatesVect.Add((Func<string>)VECARG_T0);     // EC n/a
+            delegatesVect.Add((Func<string>)VECARG_T0);     // EE n/a
 
-            delegatesVect.Add((Func<Byte, Tuple<String, byte>>)VEJ_Default); // F0 n/a
-            delegatesVect.Add((Func<Byte, Tuple<String, byte>>)VEJ_Default); // F2 n/a
-            delegatesVect.Add((Func<Byte, Tuple<String, byte>>)VEJ_w1);      // F4 
-            delegatesVect.Add((Func<Byte, Tuple<String, byte>>)VEJ_w1);      // F6 
-            delegatesVect.Add((Func<Byte, Tuple<String, byte>>)VEJ_Default); // F8 n/a
-            delegatesVect.Add((Func<Byte, Tuple<String, byte>>)VEJ_Default); // FA n/a
-            delegatesVect.Add((Func<Byte, Tuple<String, byte>>)VEJ_Default); // FC n/a
-            delegatesVect.Add((Func<Byte, Tuple<String, byte>>)VEJ_Default); // FE n/a
+            delegatesVect.Add((Func<string>)VECARG_T0);     // F0 n/a
+            delegatesVect.Add((Func<string>)VECARG_T0);     // F2 n/a
+            delegatesVect.Add((Func<string>)VECARG_T10);    // F4 
+            delegatesVect.Add((Func<string>)VECARG_T10);    // F6 
+            delegatesVect.Add((Func<string>)VECARG_T0);     // F8 n/a
+            delegatesVect.Add((Func<string>)VECARG_T0);     // FA n/a
+            delegatesVect.Add((Func<string>)VECARG_T0);     // FC n/a
+            delegatesVect.Add((Func<string>)VECARG_T0);     // FE n/a
 
             #endregion 0xFFC0-0xFFFE
 
@@ -829,44 +956,6 @@ namespace lh5801_Dis
         }
 
         /// <summary>
-        /// Read include file add LABLES, SEGMENTS, COMMENTS to matching
-        /// dictionary. Comments except in .COMMENT lines ignored
-        private void ReadLibFile()
-        {
-            lableDict = new Dictionary<ushort, string>();
-            SegmentDict = new Dictionary<ushort, SEGMENT>();
-            CommentDict = new Dictionary<ushort, string>();
-            string path = "C:\\Users\\birtj\\OneDrive\\Vintage_Computers\\Sharp_Pocket_Computer\\PC-1500\\PC-1500_DEV\\lh5801_Emu_Project\\lh5801_Dis\\Test_Code\\Include.txt";
-
-            string line;
-            StreamReader fileReader = new StreamReader(path);
-            line = fileReader.ReadLine();
-
-            // if there is an actual line
-            while (line != null)
-            {
-                // if this line is not just a comment
-                if (line != "" & !isComment.IsMatch(line))
-                {
-                    // We have a valid line, split on any white space
-                    string[] eval = line.Split(new char[0], StringSplitOptions.RemoveEmptyEntries);
-
-                    // eval[0] is directive, i.e. 'LABLE_1', '.BYTE'
-                    if (eval.Count() > 0 & isLabel.IsMatch(eval[0]))
-                    {
-                        LableHandler(eval);
-                    }
-                    else if (isDirective.IsMatch(eval[0]))
-                    {
-                        DirectiveHandler(line);
-                    }
-                }
-                line = fileReader.ReadLine();
-            }
-
-        }
-
-        /// <summary>
         ///  Lables should have 3 parts: START	.equ	$1000, '=' or '.equ'
         /// </summary>
         /// <param name="eval"></param>
@@ -891,9 +980,39 @@ namespace lh5801_Dis
                     {
                         addressOK = false;
                         System.Console.WriteLine("Error in line {0} {1} {2}", eval[0], eval[1], eval[2]);
+                        
                     }
 
-                    if (addressOK) { lableDict.Add(address, eval[0]); } // save address, lable 
+                    if (addressOK)
+                    {
+                        // check to see if this label ends in "_SIZE", if it does
+                        // and preceeding dict entry lable name is same, except for "_SIZE"
+                        // then take this value and store in preceeding entry size field
+                        // lableDict.Add(address, eval[0]);
+                        string name = eval[0];
+                        if (name.EndsWith("_SIZE"))
+                        {
+                            string name1 = eval[0].Remove(eval[0].Length - 5, 5);
+                            if (labelDict.ContainsKey(lastAddedKey) && 
+                                (labelDict[lastAddedKey].name == name1))
+                            {
+                                LABEL label = new LABEL(name1, address);
+                                labelDict[lastAddedKey] = label;
+                            }
+                            else
+                            {
+                                LABEL label = new LABEL(eval[0], 0x00);
+                                labelDict.Add(address, label);
+                                lastAddedKey = address; // save key of last dict entry
+                            }
+                        }
+                        else
+                        {
+                            LABEL label = new LABEL(eval[0], 0x00);
+                            labelDict.Add(address, label);
+                            lastAddedKey = address; // save key of last dict entry
+                        }
+                    } // save address, lable 
                 }
             }
             else
@@ -947,6 +1066,13 @@ namespace lh5801_Dis
                         case ".SKIP":
                             SegmentDict.Add(address, SEGMENT.SKIP); // catch address exists
                             break;
+                        case ".RESERVE":
+                            SegmentDict.Add(address, SEGMENT.RESERVE); //
+                            break;
+                        case ".BASTBL":
+                            SegmentDict.Add(address, SEGMENT.BASTBL); //
+                            break;
+
                         case ".COMMENT":
                             eval = line.Split(';'); // split at ';' to get comment text
                             string comment = eval[1]; // make sure comment makes sense
@@ -965,6 +1091,68 @@ namespace lh5801_Dis
         #endregion Configuration
 
         #region Helpers
+
+        /// <summary>
+        /// Returns argument type for given vector
+        /// </summary>
+        /// <param name="vector"></param>
+        /// <returns>Argument Type</returns>
+        private int VectorToArgType(int vector)
+        {
+            int value = -1;
+
+            int i = vector / 2;
+
+            if (i >= 0 && i < (ArgIndex.GetLength(0) / 2))
+            {
+                value = ArgIndex[i, 2];
+            }
+
+            return value;
+        }
+
+
+        /// <summary>
+        /// Returns argument type for given vector address
+        /// </summary>
+        /// <param name="address"></param>
+        /// <returns>Argument Type</returns>
+        private int VectorAddressToArgType(int address)
+        {
+            int value = -1;
+
+            for (int i = 0; i < ArgIndex.GetLength(0); i++)
+            {
+                if (ArgIndex[i,1] == address)
+                {
+                    return ArgIndex[i, 2];
+                }
+            }
+
+            return value;
+        }
+
+
+        /// <summary>
+        /// Returns vector index for address passeds
+        /// </summary>
+        /// <param name="address"></param>
+        /// <returns>Vector Index, -1 == no match</returns>
+        private int VectorAddressToIndex(int address)
+        {
+            int value = -1;
+
+            for (int i = 0; i < ArgIndex.GetLength(0); i++)
+            {
+                if (ArgIndex[i, 1] == address)
+                {
+                    return ArgIndex[i, 0];
+                }
+            }
+
+            return value;
+        }
+
 
         // Look at next byte but don't advance program counter
         private byte PeekByte()
@@ -1045,23 +1233,47 @@ namespace lh5801_Dis
         /// <summary>
         /// Return label for address if exists or hex formatted address
         /// </summary>
-        /// <param name="value">address</param>
+        /// <param name="address">address</param>
         /// <returns></returns>
-        private string GetAddOrLabel(ushort value)
+        private string GetAddOrLabel(ushort address)
         {
-            string output = "";
+            string output = "$" + address.ToString("X4");
 
-            if (addressLabels && lableDict.ContainsKey(value))
+            if (labelDict != null)
             {
-                output = lableDict[value];
-            }
-            else
-            {
-                output = "$" + value.ToString("X4");
+                // 1) check for exact matching lable
+                // 2) check for in bounds match 
+                // 3) default to outputting address as hex$
+
+                LABEL label = new LABEL();
+                bool valExists = labelDict.TryGetValue(address, out label);
+                int closest = labelDict.UpperBound(address); // Returns closest lower lable, or -1 if none
+
+                if (valExists)
+                {
+                    // This an exact match, use label
+                    output = label.name;
+                }
+                else if (closest > -1)
+                {
+                    // Not exact match but possibly in span of label at index 'closest'
+
+                    // Calculate last address in this span
+                    ushort last = (ushort)(labelDict.ElementAt(closest).Key +
+                        labelDict.ElementAt(closest).Value.size);
+
+                    if (address <= last)
+                    {
+                        // Address is within span of this label
+                        int offset = address - labelDict.ElementAt(closest).Key;
+                        output = labelDict.ElementAt(closest).Value.name + " + $" + offset.ToString("X2");
+                    }
+                }
             }
 
             return output;
         }
+
 
         /// <summary>
         /// Finds next SEGMENT definition, if any
@@ -1070,29 +1282,33 @@ namespace lh5801_Dis
         private void FindNextSegment(ushort address)
         {
             bool match = false;
-            ushort i = 0;
-            SegmentEnd = 65535;
+            int i = SegmentLastIndex;   // start at index of last matching segment
+            SegmentMode = SEGMENT.CODE; // default setting
+            SegmentEnd = 0xFFFF;        // default setting
 
-            // use default of CODE segmetn mode if libFile read not enabled
-            if (libFileEnable)
+            // Make sure we want to use lib file and that we have one to use
+            if (libFileEnable && SegmentDict != null)
             {
-                //iterate through frag dictionary, stop iterating when match found
+                //iterate through segment dictionary, stop iterating when match found
                 do
                 {
+                    // if current address (P) >= this segment address may be our match
+                    // we'll keep checking until current address < this segment address
                     if (address >= SegmentDict.ElementAt(i).Key)
                     {
                         SegmentMode = SegmentDict.ElementAt(i).Value;
-                        match = true;
+                        SegmentLastIndex = i;   // save as starting position for next time
+                        SegmentEnd = 0xFFFF;    // set to default 
 
+                        // If next segment exists set SegmentEnd to its start address
                         if (i + 1 < SegmentDict.Count)
                         {
-                            // set FragEnd to address of next fragment if one exists
                             SegmentEnd = (ushort)(SegmentDict.ElementAt(i + 1).Key - 1);
                         }
-                        //else
-                        //{
-                        //    SegmentEnd = 65535;
-                        //}
+                    }
+                    else
+                    {
+                        match = true;   // we are done searching
                     }
 
                     i++;
@@ -1108,130 +1324,90 @@ namespace lh5801_Dis
         /// <summary>
         /// Default hanlder for vector calls with no arguments
         /// </summary>
-        /// <param name="numBytes"></param>
         /// <returns></returns>
-        private Tuple<String, byte> VEJ_Default(Byte numBytes)
+        private string VECARG_T0()
         {
-            return Tuple.Create("", (byte)0);
+            return "";
         }
 
         /// <summary>
-        /// String representation of vector jump arguments
-        /// with 78b1 format (byte value t0 -> $78b1 address)
+        /// String representation of Type 1 vector arguments
+        /// Format '78b1', argument is low byte of $78b1 address
         /// </summary>
-        /// <returns></returns>
-        private Tuple<String, byte> VEJ_78b1(Byte numBytes)
+        /// <returns>ABYTL(ARG)</returns>
+        private string VECARG_T1()
         {
-            byte value = GetByte();   // P += 1
-            return Tuple.Create(String.Format("$78{0:X2}", value), (byte)1);
+            byte b1 = GetByte();   // P += 1
+            return String.Format(" \\ ABYTL($78{0:X2})", b1);
         }
 
         /// <summary>
-        /// String representation of vector jump arguments
-        /// with b1 format (byte value)
+        /// String representation of vector arguments
+        /// Arguments T2: ABRF
         /// </summary>
         /// <returns></returns>
-        private Tuple<String, byte> VEJ_b1(Byte numBytes)
+        private string VECARG_T2()
+        {
+            byte b1 = GetByte();   // P += 1
+            ushort address = (ushort)(P + b1);
+            return String.Format(" \\ ABRF({0:X4})", GetAddOrLabel(address));
+        }
+
+        /// <summary>
+        /// String representation of vector arguments
+        /// Arguments Type 3 ABYT, ABRF 
+        /// </summary>
+        /// <returns></returns>
+        private string VECARG_T3()
         {
             byte b1 = GetByte();    // P += 1
+            byte b2 = GetByte();    // P += 1
+            ushort address = (ushort)(P + b2);
 
-            return Tuple.Create(String.Format("${0:X2}", b1), (byte)1);
+            return String.Format(" \\ ABYT(${0:X2}) \\ ABRF({1:X4})", b1, GetAddOrLabel(address));
         }
 
         /// <summary>
         /// String representation of vector jump arguments
-        /// with b1_b2 format (byte value, byte value)
+        /// Type 4 ABRF, ABYT     
         /// </summary>
         /// <returns></returns>
-        private Tuple<String, byte> VEJ_b1_b2(Byte numBytes)
+        private string VECARG_T4()
+        {
+            byte b1 = GetByte();    // P += 1
+            byte b2 = GetByte();    // P += 1
+            ushort address = (ushort)(P + b1);
+
+            return String.Format(" \\ ABRF({0:X4}) \\ ABYT(${1:X2})", GetAddOrLabel(address), b2);
+        }
+
+        /// <summary>
+        /// String representation of vector jump arguments
+        /// Type  ABYT, ABYT     
+        /// </summary>
+        /// <returns></returns>
+        private string VECARG_T5()
         {
             byte b1 = GetByte();    // P += 1
             byte b2 = GetByte();    // P += 1
 
-            return Tuple.Create(String.Format("${0:X2},${1:X2}", b1, b2), (Byte)2);
+            return String.Format(" \\ ABYT(${0:X2}) \\ ABYT(${1:X2})", b1, b2);
         }
 
         /// <summary>
-        /// String representation of vector jump arguments
-        /// with b1_o1 format (byte value, byte branch offset)
+        /// String representation of T6 vector arguments
         /// </summary>
-        /// <returns></returns>
-        private Tuple<String, byte> VEJ_b1_o1(Byte numBytes)
+        /// <returns>String representation of arguments</returns>
+        private String VECARG_T6()
         {
-            byte variable = GetByte();    // P += 1
-            byte value    = GetByte();    // P += 1
-            ushort address = (ushort)(P + value);
 
-            return Tuple.Create(String.Format("${0:X2},{1:X4}", variable, GetAddOrLabel(address)), (Byte)2);
-        }
-
-        /// <summary>
-        /// String representation of vector jump arguments
-        /// with b1_b2_o1 format (byte value, byte value, byte branch offset)
-        /// </summary>
-        /// <returns></returns>
-        private Tuple<String, byte> VEJ_b1_b2_o1(Byte numBytes)
-        {
-            byte b1    = GetByte(); // P += 1
-            byte b2    = GetByte(); // P += 1
-            byte value = GetByte(); // P += 1
-            ushort address = (ushort)(P + value);
-
-            return Tuple.Create(String.Format("${0:X2},${1:X2},{2:X4}", b1, b2, GetAddOrLabel(address)), (Byte)3);
-        }
-
-        /// <summary>
-        /// String representation of vector jump arguments
-        /// with b1_n(b2_o1) format (byte #arg pairs, [byte charecter, byte branch offset])
-        /// </summary>
-        /// <returns></returns>
-        private Tuple<String, byte> VEJ_b1_nb2o1(Byte numBytes)
-        {
-            StringBuilder sb = new StringBuilder();
-            byte numArgs = (byte)(GetByte()* 4);    // (b1) P += 1 
-            byte character;                         // (b2)
-            byte offset;                            // (o1)
-
-            for (int i = 0; i < numArgs; i+=2)
-            {
-                character = GetByte();  // P += 1
-                offset = GetByte();     // P += 1
-                ushort address = (ushort)(P + offset);
-
-                sb.AppendLine(String.Format(",${0:X2},{1:X4}", character, GetAddOrLabel(address)));
-                sb.Append("                                         ");
-            }
-
-            sb.Remove(0, 1); // remove leading comma
-            return Tuple.Create(sb.ToString(), (numArgs += 1) );
-        }
-
-        /// <summary>
-        /// String representation of vector jump arguments
-        /// with o1 format (byte branch offset)
-        /// </summary>
-        /// <returns></returns>
-        private Tuple<String, byte> VEJ_o1(Byte numBytes)
-        {
-            byte value = GetByte();   // P += 1
-            ushort address = (ushort)(P + value);
-            return Tuple.Create(String.Format("{0:X4}", GetAddOrLabel(address)), (Byte)1);
-        }
-
-        /// <summary>
-        /// String representation of vector jump arguments
-        /// with p_o1 format (byte/word value, byte branch offset)
-        /// </summary>
-        /// <returns></returns>
-        private Tuple<String, byte> VEJ_p_o1(Byte numBytes)
-        {
-            if (numBytes == 4) // p is a function
+            if (PeekByte() >= 0xE0) // p is a function
             {
                 ushort token = GetWord();   // P += 2
                 byte   value = GetByte();   // P += 1
                 ushort address = (ushort)(P + value);
 
-                return Tuple.Create(String.Format("${0:X4},{1:X4}", token, GetAddOrLabel(address)), (Byte)4);
+                return String.Format(" \\ AWRD(${0:X4}) \\ ABRF({1:X4})", token, GetAddOrLabel(address));
             }
             else // p is a character
             {
@@ -1239,48 +1415,99 @@ namespace lh5801_Dis
                 byte value     = GetByte();   // P += 1
                 ushort address = (ushort)(P + value);
 
-                return Tuple.Create(String.Format("${0:X2},{1:X4}", character, GetAddOrLabel(address)), (Byte)3);
+                return String.Format(" \\ ACHR(${0:X2}) \\ ABRF({1:X4})", character, GetAddOrLabel(address));
             }
         }
 
         /// <summary>
         /// String representation of vector jump arguments
-        /// with w1 format (word address)
+        /// Arguments Type 7 ABYT,ABYT,ABRF
         /// </summary>
         /// <returns></returns>
-        private Tuple<String, byte> VEJ_w1(Byte numBytes)
+        private string VECARG_T7()
         {
-            ushort address = GetWord();   // P += 2
-            return Tuple.Create(String.Format("{0:X4}", GetAddOrLabel(address)), (Byte)2);
+            byte b1 = GetByte(); // P += 1
+            byte b2 = GetByte(); // P += 1
+            byte b3 = GetByte(); // P += 1
+            ushort address = (ushort)(P + b3);
+
+            return String.Format(" \\ ABYT(${0:X2}) \\ ABYT(${1:X2}) \\ ABRF({2:X4})", b1, b2, GetAddOrLabel(address));
         }
 
-        // Indexed Vector Opcodes: VCR, VCS, VHR, VHS, VMJ, VVS, VZR, VZS
-        private string VectorIndex(byte opcode, out byte numArgs)
+        /// <summary>
+        /// String representation of vector jump arguments
+        /// Arguments Type 8 ABYT(#arg pairs), ABYT \ ABRF (arg pairs)
+        /// </summary>
+        /// <returns></returns>
+        private string VECARG_T8()
+        {
+            StringBuilder sb = new StringBuilder();
+            byte numArgs = GetByte();   // (b1) P += 1 
+            byte character;             // (b2)
+            byte offset;                // (o1)
+
+            sb.Append(String.Format(" \\ ABYT(${0:X2})", numArgs)); 
+
+            for (int i = 0; i <= numArgs; i++)
+            {
+                character = GetByte();  // P += 1
+                offset = GetByte();     // P += 1
+                ushort address = (ushort)(P + offset);
+
+                sb.Append(String.Format(" \\ ABYT(${0:X2}) \\ ABRF({1:X4})", character, GetAddOrLabel(address)));
+            }
+
+            return sb.ToString() ;
+        }
+
+        /// <summary>
+        /// String representation of vector jump arguments
+        /// Type 9, ABYT
+        /// </summary>
+        /// <returns></returns>
+        private string VECARG_T9()
+        {
+            byte b1 = GetByte();    // P += 1
+
+            return String.Format(" \\ ABYT(${0:X2})", b1);
+        }
+
+        /// <summary>
+        /// String representation of vector jump arguments
+        /// Aguments: Type 3 AWRD
+        /// </summary>
+        /// <returns></returns>
+        private string VECARG_T10()
+        {
+            ushort address = GetWord();   // P += 2
+            return String.Format(" \\ AWRD({0:X4})", GetAddOrLabel(address));
+        }
+
+        /// <summary>
+        /// Indexed Vector Opcodes: VCR, VCS, VHR, VHS, VMJ, VVS, VZR, VZS
+        /// Uses ArgIndex array {index, address, argument types} array
+        /// to figure out which handler function to call
+        /// </summary>
+        /// <param name="vector">Jump vector byte</param>
+        /// <returns></returns>
+        private string VectorIndex(byte vector)
         {
             String output = "";
-            Tuple<String, byte> retValues;// = new Tuple<String, byte>("", 1);
-            byte lowNibble = GetByte(); // P += 1, Vector low nibble / 2 = index
-            int index = lowNibble / 2;  // index into vector delgate list
-            numArgs = vecArgs[index];   // get # args from vector#, i.e. $FF(00)=3 Args (may not need)
+            int index = vector / 2;  // index into ArgIndex array
 
             // we skip middle 64 vectors as they take no arguments
             if (index >=0 && index < 32) // 0-31 (32-63,64-95) 96-127
             {
-                retValues = (Tuple<String, byte>)(delegatesVect[index].DynamicInvoke(numArgs));
-                output = String.Format("(${0:X2}),{01}", lowNibble, retValues.Item1);
-                numArgs = (byte)(retValues.Item2 + 1);
+                output = (string)(delegatesVect[index].DynamicInvoke());
             }
             else if (index > 31 && index < 96)
             {
-                output = String.Format("(${0:X2})", lowNibble);
-                numArgs += 1;
+                output = String.Format("(${0:X2})");
             }
             else if(index > 95 && index < 128)
             {
                 // we skipped 32-95 in delegate table, offset index
-                retValues = (Tuple<String, byte>)(delegatesVect[index-64].DynamicInvoke(numArgs));
-                output = String.Format("(${0:X2}),{01}", lowNibble, retValues.Item1);
-                numArgs = (byte)(retValues.Item2 + 1);
+                output = (string)(delegatesVect[index-64].DynamicInvoke());
             }
 
             return output;
@@ -1368,6 +1595,7 @@ namespace lh5801_Dis
         {
             disSB.Clear();  // clear the stringbuilder
             P = start;
+            SegmentLastIndex = 0;
 
             FindNextSegment(P);    // find segment for starting address
 
@@ -1380,9 +1608,6 @@ namespace lh5801_Dis
                     disSB.Append(String.Format("{0}", Environment.NewLine)); // blank line between segments
                 }
                 ushort stop = Math.Min(SegmentEnd, end);
-
-                // if we have a label for this address output it
-                if (addressLabels && lableDict.ContainsKey(P)) { LableDump(lableDict[P]); }
 
                 // Choose handler based on SEGMENT mode
                 switch (SegmentMode)
@@ -1403,7 +1628,17 @@ namespace lh5801_Dis
 
                     // dump from start/P to lesser of end of fragment or end requested range
                     case SEGMENT.TEXT:
-                        TextSegmentHandler(stop);
+                        TextSegmentHandler(stop, ".Text");
+                        break;
+
+                    // dump from start/P to lesser of end of fragment or end requested range
+                    case SEGMENT.RESERVE:
+                        ReserveSegmentHandler(stop);
+                        break;
+
+                    // dump from start/P to lesser of end of fragment or end requested range
+                    case SEGMENT.BASTBL:
+                        BastblSegmentHandler(stop);
                         break;
 
                     // skip from start/P to lesser of end of fragment or end requested range
@@ -1412,7 +1647,40 @@ namespace lh5801_Dis
                         break;
                 }
 
+                // *** could write out file here
+
             } while (P < (end + 1));
+
+            // *** could write out file here
+            if (outputFile)
+            {
+                string newPath = "";
+                if (FilePath !="")
+                {
+                    if (listFormat)
+                    {
+                        newPath = Path.ChangeExtension(FilePath, "lst");
+                    }
+                    else
+                    {
+                        newPath = Path.ChangeExtension(FilePath, "asm");
+                    }
+
+                    StreamWriter stream = new StreamWriter(newPath);
+                    stream.Write(disSB.ToString());
+
+                    stream.Close();
+                }
+                
+            }
+
+        }
+
+        public void quickTest()
+        {
+            string result;
+            BASIC_Keywords.TryGetValue((ushort)0x0123, out result);
+            string bob = result;
         }
 
         /// <summary>
@@ -1425,8 +1693,155 @@ namespace lh5801_Dis
             return disSB.ToString();
         }
 
-        #endregion UI Interface
+        /// <summary>
+        /// Load BIN file to starting address in 'address'
+        /// </summary>
+        /// <param name="fileName">File path</param>
+        /// <param name="result">Debug output string</param>
+        /// <param name="address">Starting adress</param>
+        /// <param name="useME0">True = use MEO, False = use ME1</param>
+        /// <returns>True if bin and lib file loaded</returns>
+        public bool LoadBinFile(string fileName, out string result, ushort address, bool useME0)
+        {
+            bool success = true; // set to false on any error
+            result = "";
+            FilePath = fileName;
 
+            FileStream inputfs = new FileStream(FilePath, FileMode.Open, FileAccess.Read);
+            BinaryReader fileReader = new BinaryReader(inputfs);
+            long fileSize = inputfs.Length;
+            ushort spaceLeft = (ushort)(0xFFFF - address);
+
+            if (fileSize > spaceLeft)
+            {
+                string message = String.Format("File too large{0}", Environment.NewLine);
+                result = message;
+            }
+            else
+            {
+                for (long i = 0; i < fileSize; i++)
+                {
+                    if (useME0)
+                    {
+                        RAM_ME0[address + i] = fileReader.ReadByte();
+                    }
+                    else
+                    {
+                        RAM_ME1[address + i] = fileReader.ReadByte();
+                    }
+
+                }
+
+            }
+
+            labelDict = new SortedList<ushort, LABEL>();
+            SegmentDict = new Dictionary<ushort, SEGMENT>();
+            CommentDict = new Dictionary<ushort, string>();
+
+            string resOut;
+            success = ReadLibFile(Path.ChangeExtension(fileName, "lib"), out resOut);
+            result += resOut;
+
+            return success;
+        }
+
+        /// <summary>
+        /// Save specified byte range
+        /// </summary>
+        /// <param name="fileName">Path/name of file</param>
+        /// <param name="startAdress">Start address in RAM</param>
+        /// <param name="endAddress">End address in RAM</param>
+        /// <param name="useME0">True = RAM ME0, False =  RAM ME1</param>
+        /// <returns></returns>
+        public string SaveBinFile(string fileName, ushort startAddress, ushort endAddress, bool useME0)
+        {
+            string result = ""; // add error string later
+
+            FileStream outputfs = new FileStream(fileName, FileMode.Create);
+            BinaryWriter fileWriter = new BinaryWriter(outputfs);
+
+            for (long i = startAddress; i < (endAddress + 1); i++)
+            {
+                if (useME0)
+                {
+                    fileWriter.Write((byte)RAM_ME0[i]);
+                }
+                else
+                {
+                    fileWriter.Write((byte)RAM_ME1[i]);
+                }
+            }
+
+            fileWriter.Close();
+            return result;
+        }
+
+        /// <summary>
+        /// Read include file add LABLES, SEGMENTS, COMMENTS to matching
+        /// dictionary. Comments except in .COMMENT lines ignored
+        /// *** if loaded OK, turn on lables, etc.
+        private bool ReadLibFile(string fileName, out string result)
+        {
+            bool success = true; // set to false on any failure
+            result = "";
+
+            if (File.Exists(fileName))
+            {
+                string line;
+                StreamReader fileReader = new StreamReader(fileName);
+                line = fileReader.ReadLine();
+
+                // if there is an actual line
+                while (line != null)
+                {
+                    // if this line is not just a comment
+                    if (line != "" & !isComment.IsMatch(line))
+                    {
+                        if (isInclude.IsMatch(line) && includeLevel == 0)
+                        {
+                            includeLevel = 1;
+                            string incPath = Path.GetDirectoryName(fileName) + "\\" + getIncFile.Match(line).ToString();
+                            if (incPath != fileName) 
+                            {
+                                // make sure not same file!
+                                string incResult;
+                                success = ReadLibFile(incPath, out incResult);
+                                result += incResult;
+                            } 
+                        }
+
+
+                        // We have a valid line, split on any white space
+                        string[] eval = line.Split(new char[0], StringSplitOptions.RemoveEmptyEntries);
+
+                        // eval[0] is directive, i.e. 'LABLE_1', '.BYTE'
+                        if (eval.Count() > 0 & isLabel.IsMatch(eval[0]))
+                        {
+                            LableHandler(eval);
+                        }
+                        else if (isDirective.IsMatch(eval[0]))
+                        {
+                            DirectiveHandler(line);
+                        }
+
+                    }
+
+                    line = fileReader.ReadLine();
+                }
+
+                result += String.Format("File: {0} , was loaded.{1}", Path.GetFileName(fileName), Environment.NewLine);
+                fileReader.Close();
+            }
+            else
+            {
+                result += String.Format("File: {0} , does not exist.{1}", Path.GetFileName(fileName), Environment.NewLine);
+                success = false;
+            }
+
+            return success;
+        }
+
+        #endregion UI Interface
 
         #region SEGMENT handlers
 
@@ -1435,10 +1850,14 @@ namespace lh5801_Dis
         /// </summary>
         /// Listformat handled by individual opcode functions
         /// <param name="end"></param>
-        private void CodeSegmentHandler(ushort stop)
+        private void CodeSegmentHandler(ushort stop, bool supressLable = false)
         {
             while (P <= stop)
             {
+                // if we have a label for this address output it
+                if (addressLabels && labelDict != null 
+                    && labelDict.ContainsKey(P) && !supressLable) { LableDump(labelDict[P].name); }
+
                 byte opcode = RAM_ME0[P];   // grab next opcode
                 delegatesTbl1[opcode].DynamicInvoke();
             }
@@ -1448,8 +1867,18 @@ namespace lh5801_Dis
         /// Handles BYTE segments
         /// </summary>
         /// <param name="end"></param>
-        private void ByteSegmentHandler(ushort stop)
+        private void ByteSegmentHandler(ushort stop, string altLable = "")
         {
+            // if we have a label for this address output it
+            if (altLable != "")
+            {
+                LableDump(altLable);
+            }
+            else if (addressLabels && labelDict.ContainsKey(P)) 
+            { 
+                LableDump(labelDict[P].name); 
+            }
+
             while (P <= stop )
             {
                 int bytesLeft = stop - P + 1;
@@ -1475,6 +1904,9 @@ namespace lh5801_Dis
         /// <param name="end"></param>
         private void WordSegmentHandler(ushort stop)
         {
+            // if we have a label for this address output it
+            if (addressLabels && labelDict.ContainsKey(P)) { LableDump(labelDict[P].name); }
+
             while (P <= stop)
             {
                 int bytesLeft = stop - P + 1;
@@ -1499,27 +1931,376 @@ namespace lh5801_Dis
         /// Handles TEXT segments
         /// </summary>
         /// <param name="end"></param>
-        private void TextSegmentHandler(ushort stop)
+        private void TextSegmentHandler(ushort stop, string altLable = "", string description = ".TEXT")
         {
-            if (listFormat) { LineDump(P, stop - P + 1); } // dump bytes
-            disSB.Append(".TEXT  \"");
+            // if we have a label for this address output it
+            if (altLable != "")
+            {
+                LableDump(altLable);
+            }
+            else if (addressLabels && labelDict.ContainsKey(P))
+            {
+                LableDump(labelDict[P].name);
+            }
+            bool firstLine = true;
 
             while (P <= stop)
             {
-                disSB.Append(String.Format("{0}", (char)(RAM_ME0[P])));
-                P++;
+                int bytesLeft = stop - P + 1;
+                if (listFormat) { LineDump(P, Math.Min(bytesLeft, 8)); } // dump bytes
+
+                if (firstLine && description != ".TEXT")
+                {
+                    // Dumps prepared string on first line
+                    disSB.Append(String.Format("{0}",description));
+                    firstLine = false;
+                    P = (ushort)(Math.Min(P + 8, stop + 1));
+                }
+                else if (description == ".TEXT")
+                {
+                    disSB.Append(string.Format("{0}  ",description));
+                    // Creates string from any printable chars in line (8 bytes)
+                    int lineCount = 0;
+                    while (lineCount < 8 && P <= stop)
+                    {
+                        char nextChar = (char)(RAM_ME0[P]);
+                        if (char.IsControl(nextChar)) { nextChar = '.'; }
+
+                        disSB.Append(String.Format("{0}", nextChar));
+                        lineCount++;
+                        P++;
+                    }
+                }
+                else
+                {
+                    P = (ushort)(Math.Min(P+8, stop+1));
+                }
+
+                disSB.Replace(",", "", disSB.Length - 1, 1);
+                disSB.Append(String.Format("{0}", Environment.NewLine));
             }
 
-            disSB.Append(String.Format("\"{0}", Environment.NewLine));
+        }
+
+
+        /// <summary>
+        /// Handles RESERVE segments
+        /// </summary>
+        /// <param name="stop">Index to stop searching at</param>
+        private void ReserveSegmentHandler(ushort stop)
+        {
+            // If we have a label for this segment it will be output in the TextSegmentHander called
+
+            // First check that we have enough room from P->stop for Reserve Memory
+            if (stop - P < 0xBC) { return; }
+
+            // Dump the string 'Templates' for each Reserve area
+            string resv = "";               // 
+            string resLable = ".RES_I";     // Compiler directive for Reserve Template Text
+            for (int i = 0; i < 3; i ++)
+            {
+                // skimResTemplateText does not in P, TextSegmentHandler does inc P
+                resv = String.Format("{0,-10}{1}", resLable, skimResTemplateText( (ushort)(P + 25) ));
+                TextSegmentHandler((ushort)(P + 25), resv);
+                resLable += "I";
+            }
+
+            // Look for Registrations, decode and dump
+            while (P <= stop)
+            {
+                string level = "";
+                SPAN span = skimResRegistration(stop);  // does not inc P
+                
+                // If Registration found decode it
+                if (span.start >= 0 && span.end <= stop)
+                {
+                    // First byte is the Reserve level and key code
+                    level = decodeResKeyCode(RAM_ME0[span.start]);
+
+                    // Remaining bytes tokens or text
+                    for (int i = span.start+1; i <= span.end; i++)
+                    {
+                        if (RAM_ME0[i] > 0xE0)
+                        {
+                            // A BASIC token
+                            ushort token = (ushort)((RAM_ME0[i]) << 8);
+                            token |= (ushort)(RAM_ME0[i + 1]); i += 1;
+
+                            string result;
+                            BASIC_Keywords.TryGetValue(token, out result);
+
+                            if (result == null) { result = "  "; }
+                            level = level + " " + result;
+                        }
+                        else if (RAM_ME0[i] >= 0x20 && RAM_ME0[i] <= 0x7E)
+                        {
+                            // Printable charecters
+                            level += (char)RAM_ME0[i];
+                        }
+                        else
+                        {
+                            // Non-printable charecters
+                            level += "_";
+                        }
+                    }
+
+                    // Dump segment as hex on left, text on first line right hand side
+                    level = String.Format("{0,-10}{1}", ".RESREG", level);
+                    TextSegmentHandler((ushort)(span.end), level);
+                }
+                else
+                {
+                    // No registration, dump as raw text
+                    level = ".TEXT";
+                    TextSegmentHandler((ushort)(span.end));
+                }
+
+                P = (ushort)(span.end +1 );
+            }
 
         }
+
+
+        /// <summary>
+        /// Handles BSIC Table segments
+        /// </summary>
+        /// <param name="stop">Index to stop searching at</param>
+        private void BastblSegmentHandler(ushort stop)
+        {
+            // Should we output lable here?
+            // if (addressLabels && labelDict.ContainsKey(P)) { LableDump(labelDict[P].name); }
+
+            // Make sure we have enough file left for an entire BASIC Table
+            if (stop - P < 0x53) { return; }
+
+            // Controller bytes $00-$53
+
+            
+            ByteSegmentHandler(P);                                  // Byte 0x00 should be 0x55
+            ByteSegmentHandler(P, "TABLE#");                        // Byte 0x01 is table number
+            TextSegmentHandler((ushort)(P + 7), "NAME");            // Bytes 0x02-0x09 Name terminated by 0x0D (used by OPN)
+            ByteSegmentHandler((ushort)(P + 2), "INIT_VEC");        // Bytes 0x0A-0x0C Init vector
+            ByteSegmentHandler((ushort)(P + 2), "INPUT#");          // Bytes 0x0D-0x0F INPUT# vector
+            ByteSegmentHandler((ushort)(P + 2), "PRINT#");          // Bytes 0x0D-0x0F PRINT# vector
+            ByteSegmentHandler((ushort)(P + 9), "MISC_VEC");        // Bytes 0x13-0x1C Misc vectors, may be filled with 0x9A
+            ByteSegmentHandler((ushort)(P + 2), "TRACE");           // Bytes 0x0D-0x0F Protocol or TRACE vector, may be filled w/ 0xC4,AF,FF
+
+
+            for (int l= 0; l < 26; l++)
+            {
+                string text = string.Format("LETTER_{0}", (char)(l+0x41));
+                ByteSegmentHandler((ushort)(P + 1), text);          // Bytes 0x20-0x53 26 two byte letter pointers, If letter not used will be 0x0000
+            }
+            disSB.Append(String.Format("{0}", Environment.NewLine));
+
+            // Now we have an unknown number of instructions of unknown length
+            // B0       : Control nibble, HN is control nibble of previous command, LN is Length of this commands name
+            // B1 - Bn  : keyword name in ASCII
+            // Bn+1 - Bn+2: Token
+            // Bn+3 - Bn+4: Start Address
+            // Display as: Address  Ctrl  Name  Token  Vector
+            bool done = false;
+
+            // Display header
+            disSB.Append(String.Format("{0}{1,6}{2,6}{3,19}{4,8}","Addr","Ctrl","Name","Token","Vector"));
+            disSB.Append(String.Format("{0}", Environment.NewLine));
+
+            while (!done)
+            {
+                byte CN = RAM_ME0[P];
+                P = (ushort)(P + 1);
+
+                done = (CN & 0x0F) > 0 ? false : true;
+                int nLength = CN & 0x0F;
+
+                if (!done)
+                {
+                    string name = Encoding.UTF8.GetString(RAM_ME0, P, nLength);
+                    P = (ushort)(P + nLength);
+
+                    int token = ((int)RAM_ME0[P] << 8) | RAM_ME0[P + 1];
+                    P = (ushort)(P + 2);
+
+                    int stAddress = ((int)(RAM_ME0[P] << 8)) | RAM_ME0[P + 1];
+                    P = (ushort)(P + 2);
+
+                    disSB.Append(String.Format("{0:X4}  {1,4:X2}  {2,-16}  {3,2:X4}  {4,5:X4}", P, CN, name, token, stAddress));
+                    disSB.Append(String.Format("{0}", Environment.NewLine));
+                }
+                else
+                {
+                    disSB.Append(String.Format("{0:X4}  {1,4:X2}", P, CN));
+                    disSB.Append(String.Format("{0}", Environment.NewLine));
+                }
+            }
+
+
+            disSB.Replace(",", "", disSB.Length - 1, 1);
+            disSB.Append(String.Format("{0}", Environment.NewLine));
+
+        }
+
+
+        /// <summary>
+        /// Skims Reserve Text Tempalte for valid text
+        /// </summary>
+        /// <param name="stop">Last address to search</param>
+        /// <returns>String representing template</returns>
+        private string skimResTemplateText(ushort stop)
+        {
+            string value = "";
+            ushort pTemp = P;
+
+            // May want to return null if first byte is 0x00
+            while (pTemp <= stop)
+            {
+                char nextChar = (char)(RAM_ME0[pTemp]);
+                if (char.IsControl(nextChar)) { nextChar = ' '; }
+                value += nextChar;
+                pTemp++;
+            }
+
+            if (value != "") { value = String.Format("\"{0}\"", value); }
+            return value;
+        }
+
+
+        /// <summary>
+        /// Skims Reserve Registration for next entry
+        /// </summary>
+        /// <param name="stop">Last address to search</param>
+        /// <returns>SPAN.start = reg start index or -1 if reg start not found
+        /// SPAN.end = reg end index or -1 if reg not found</returns>
+        private SPAN skimResRegistration(ushort stop)
+        {
+            SPAN span = new SPAN(-1, -1);
+            ushort pTemp = P;
+
+            // If keyCode == -1 no keyCode found,
+            // else keyCode is index of first possible key code found
+            int keyCodeIndex = findNextKeyCode(pTemp, stop);
+
+            // No keycode found 
+            if (keyCodeIndex == -1)
+            {
+                span.start = -1;            // signal this entire span is a void
+                span.end = stop;            // we searched till end
+                //return span;
+            }
+            else if (keyCodeIndex > pTemp)
+            {
+                // First keycode occured after beginning of search, we found a void
+                span.start = -1;            // signal start of void
+                span.end = keyCodeIndex - 1;// end of void span was before the keycode
+                // return span;
+            }
+            else
+            {
+                // we found actual start of registration
+                span.start = keyCodeIndex;  // keyCodeIndex is Registration start
+                span.end = -1;              // we have not found the end yet
+
+                // Now look for end of registration starting one byte past its start
+                keyCodeIndex = findRegistrationEnd((ushort)(keyCodeIndex + 1), stop);
+
+                // we hit stop before finding a valid keyCode
+                if (keyCodeIndex == -1)
+                {
+                    span.end = stop;            // span eded at stop
+                }
+                else
+                {
+                    span.end = keyCodeIndex - 1;// end of registartion before stop
+                }
+            }
+
+            return span;
+        }
+
+
+        /// <summary>
+        /// Searches for next possbible registration start of registration
+        /// </summary>
+        /// <param name="startIndex">Index to start search</param>
+        /// <param name="stop">Index to stop search</param>
+        /// <returns></returns>
+        private int findNextKeyCode(ushort startIndex, ushort stop)
+        {
+            int value = -1;
+            byte nextByte;
+
+            // Look for registration marker with two bytes following which are > 0x20
+            while (value < 0 && startIndex + 3 <= stop)
+            {
+                nextByte = RAM_ME0[startIndex]; startIndex += 1;
+                if (nextByte > 0x00 && nextByte < 0x17 
+                    && RAM_ME0[startIndex] > 20 && RAM_ME0[startIndex + 1] > 20)
+                {
+                    value = (ushort)(startIndex - 1);
+                }
+            }
+            return value;
+        }
+
+        /// <summary>
+        /// Searches for end of current registration
+        /// </summary>
+        /// <param name="startIndex">Index to start search</param>
+        /// <param name="stop">Index to stop search</param>
+        /// <returns>Index of the end of current registration</returns>
+        private int findRegistrationEnd(ushort startIndex, ushort stop)
+        {
+            int value = -1;
+            byte nextByte;
+
+            // Look for registration marker or 0x00 (0x00 to 0x16)
+            while (value < 0 && startIndex + 1 <= stop)
+            {
+                nextByte = RAM_ME0[startIndex]; startIndex += 1;
+                if (nextByte < 0x17)
+                {
+                    value = (ushort)(startIndex - 1);
+                }
+            }
+            return value;
+        }
+
+
+        /// <summary>
+        /// Decode Reserve key code byte to human readable string
+        /// </summary>
+        /// <param name="keyCode">KeyCode byte to decode</param>
+        /// <returns>Reserve level and key as string</returns>
+        private string decodeResKeyCode(byte keyCode)
+        {
+            string value = "";
+
+            if (keyCode < 0x07)
+            {
+                value = "I.F" + keyCode.ToString();
+            }
+            else if (keyCode >= 0x09 && keyCode <= 0x0E)
+            {
+                value = "III.F" + (keyCode - 0x08).ToString();
+            }
+            else if (keyCode >= 0x11 && keyCode <= 0x16)
+            {
+                value = "II.F" + (keyCode - 0x10).ToString();
+            }
+
+            return value;
+        }
+
 
         /// <summary>
         /// Handles SKIP segments, shows skip comment, adjust P
         /// </summary>
-        /// <param name="end"></param>
+        /// <param name="stop">Index to stop search</param>
         private void SkipSegmentHandler(ushort stop)
         {
+            // if we have a label for this address output it
+            if (addressLabels && labelDict.ContainsKey(P)) { LableDump(labelDict[P].name); }
+
             while (P <= stop)
             {
                 disSB.Append(String.Format(";${0:X4} to ${1:X4} skipped", P, stop));
@@ -1527,8 +2308,8 @@ namespace lh5801_Dis
             }
         }
 
-        #endregion SEGMENT handlers
 
+        #endregion SEGMENT handlers
 
         #region OPCODES 0x00-0xFF
 
@@ -3529,7 +4310,7 @@ namespace lh5801_Dis
             P += 1; // advance Program Counter
             byte value = GetByte(); // P += 1
             ushort address = (ushort)(P - value);
-            disSB.Append(String.Format("LOP UL,{0}{1}", GetAddOrLabel(address), Environment.NewLine));
+            disSB.Append(String.Format("LOP  UL,{0}{1}", GetAddOrLabel(address), Environment.NewLine));
             //tick += 8;
         }
 
@@ -4327,11 +5108,17 @@ namespace lh5801_Dis
         /// </summary>
         private void SJP_pp()
         {
-            if (listFormat) { LineDump(P, opBytesP1[0xBE]); } // dump bytes
+            ushort startP = P;
+            P += 1;                         // advance Program Counter past opcode
+            string args = "";
 
-            P += 1;                         // advance Program Counter
             ushort address = GetWord();     // P + =2, now pointing to next instruction
-            disSB.Append(String.Format("SJP  {0}{1}", GetAddOrLabel(address), Environment.NewLine));
+            int isVec = VectorAddressToIndex(address);
+
+            if (disModePC1500 && (isVec >= 0)) { args = VectorIndex((byte)isVec); }
+
+            if (listFormat) { LineDump(startP, (ushort)(P - startP)); } // dump bytess
+            disSB.Append(String.Format("SJP  ({0}){1}{2}", GetAddOrLabel(address), args, Environment.NewLine));
             //tick += 19;
         }
 
@@ -4358,12 +5145,13 @@ namespace lh5801_Dis
         /// VEJ (C0)
         /// Vectored Call, $FF C0
         /// Opcode C0, Bytes 1
+        /// PC-1500 Arguments: Type 0, none
         /// </summary>
         public void VEJ_C0()
         {
             if (listFormat) { LineDump(P, opBytesP1[0xC0]); } // dump bytes
 
-            P += 1;                       // advance Program Counter
+            P += opBytesP1[0xC2]; // advance Program Counter past opcode
             disSB.Append(String.Format("VEJ  (C0){0}", Environment.NewLine));
             //tick += 17;
         }
@@ -4375,24 +5163,15 @@ namespace lh5801_Dis
         /// </summary>
         public void VCR_n()
         {
+            ushort startP = P;
             P += 1; // advance Program Counter
-            byte numBytes = 2;
-            //byte numArgs = 0;
             string args = "";
 
-            if (disModePC1500)
-            {
-                args = VectorIndex(0xC1, out numBytes);
-                numBytes += 1;
-            }
-            else
-            {
-                byte value = GetByte(); // P += 1
-                args = String.Format("${0:X2}", value);
-            }
+            byte value = GetByte(); // P += 1
+            if(disModePC1500) { args = VectorIndex(value); }
 
-            if (listFormat) { LineDump((ushort)(P - numBytes), numBytes); } // dump bytes
-            disSB.Append(String.Format("VCR  {0}{1}", args, Environment.NewLine));
+            if (listFormat) { LineDump(startP, (ushort)(P - startP)); } // dump bytess
+            disSB.Append(String.Format("VCR  (${0:X2}){1}{2}", value, args, Environment.NewLine));
         }
 
         /// <summary>
@@ -4400,25 +5179,16 @@ namespace lh5801_Dis
         /// Vectored Call, $FF C2
         /// Opcode C2, Bytes 1
         /// </summary>
-        /// VEJ (C2),*p,b2 - For PC-1500 arguments follow this opcode
-        /// If next character/token is not '*p', branch fwd 'b2'. 
-        /// *If  first arg >= E0, then '*p' is a function & 2 bytes, i.e. 3 total bytes in argument.
+        /// PC-1500 arguments: Type 6, ACHR or AWRD (if first byte > $E0), ABRF
         public void VEJ_C2()
         {
-            P += 1; // advance Program Counter
-            Tuple<String, byte> retValues = new Tuple<String, byte>("", 1);
-            byte numBytes = opBytesP1[0xC2];
+            ushort startP = P;
+            P += opBytesP1[0xC2]; // advance Program Counter past opcode
             String args = "";
 
-            if (disModePC1500)
-            {
-                numBytes += 2;
-                if (PeekByte() >= 0xE0) { numBytes += 1; } // +1 bytes if function
-                retValues = VEJ_p_o1(numBytes);
-                args = String.Format(",{0}", retValues.Item1);
-            }
+            if (disModePC1500) { args = VECARG_T6(); }
 
-            if (listFormat) { LineDump((ushort)(P - numBytes), numBytes); } // dump bytes
+            if (listFormat) { LineDump(startP, (ushort)(P - startP)); } // dump bytes
             disSB.Append(String.Format("VEJ  (C2){0}{1}", args, Environment.NewLine));
             //tick += 17;
         }
@@ -4430,23 +5200,15 @@ namespace lh5801_Dis
         /// </summary>
         public void VCS_n()
         {
+            ushort startP = P;
             P += 1; // advance Program Counter
-            byte numBytes = 2;
             string args = "";
 
-            if (disModePC1500)
-            {
-                args = VectorIndex(0xC3, out numBytes);
-                numBytes += 1;
-            }
-            else
-            {
-                byte value = GetByte(); // P += 1
-                args = String.Format("${0:X2}", value);
-            }
+            byte value = GetByte(); // P += 1
+            if (disModePC1500) { args = VectorIndex(value); }
 
-            if (listFormat) { LineDump((ushort)(P - numBytes), numBytes); } // dump bytes
-            disSB.Append(String.Format("VCS  {0}{1}", args, Environment.NewLine));
+            if (listFormat) { LineDump(startP, (ushort)(P - startP)); } // dump bytess
+            disSB.Append(String.Format("VCS  (${0:X2}){1}{2}", value, args, Environment.NewLine));
         }
 
         /// <summary>
@@ -4454,25 +5216,16 @@ namespace lh5801_Dis
         /// Vectored Call, $FF C4
         /// Opcode C4, Bytes 1
         /// </summary>
-        /// VEJ (C4),*p,b2 - For PC-1500 arguments follow this opcode
-        /// If next character/token in U is not '*p', branch fwd 'b2'. 
-        /// *If  first arg >= E0, then '*p' is a function & 2 bytes, i.e. 3 total bytes in argument. 
+        /// For PC-1500: arguments Type 6, ACHR or AWRD (if first byte > $E0), ABRF 
         public void VEJ_C4()
         {
-            Tuple<String, byte> retValues = new Tuple<String, byte>("", 1);
-            P += 1; // advance Program Counter
-            byte numBytes = opBytesP1[0xC4];
+            ushort startP = P;
+            P += opBytesP1[0xC4]; // advance Program Counter
             String args = "";
 
-            if (disModePC1500)
-            {
-                numBytes += 2;
-                if (PeekByte() >= 0xE0) { numBytes += 1; } // +1 bytes if function
-                retValues = VEJ_p_o1(numBytes);
-                args = String.Format(",{0}", retValues.Item1);
-            }
+            if (disModePC1500) { args = VECARG_T6(); }
 
-            if (listFormat) { LineDump((ushort)(P - numBytes), numBytes); } // dump bytes
+            if (listFormat) { LineDump(startP, (ushort)(P - startP)); } // dump bytes
             disSB.Append(String.Format("VEJ  (C4){0}{1}", args, Environment.NewLine));
             //tick += 17;    
         }
@@ -4484,23 +5237,15 @@ namespace lh5801_Dis
         /// </summary>
         public void VHR_n()
         {
+            ushort startP = P;
             P += 1; // advance Program Counter
-            byte numBytes = 2;
             string args = "";
 
-            if (disModePC1500)
-            {
-                args = VectorIndex(0xC5, out numBytes);
-                numBytes += 1;
-            }
-            else
-            {
-                byte value = GetByte(); // P += 1
-                args = String.Format("${0:X2}", value);
-            }
+            byte value = GetByte(); // P += 1
+            if (disModePC1500) { args = VectorIndex(value); }
 
-            if (listFormat) { LineDump((ushort)(P - numBytes), numBytes); } // dump bytes
-            disSB.Append(String.Format("VHR  {0}{1}", args, Environment.NewLine));
+            if (listFormat) { LineDump(startP, (ushort)(P - startP)); } // dump bytess
+            disSB.Append(String.Format("VHR  (${0:X2}){1}{2}", value, args, Environment.NewLine));
         }
 
         /// <summary>
@@ -4508,11 +5253,12 @@ namespace lh5801_Dis
         /// Vectored Call, $FF C6
         /// Opcode C6, Bytes 1
         /// </summary>
+        /// PC-1500: Arguments Type 0, none
         public void VEJ_C6()
         {
             if (listFormat) { LineDump(P, opBytesP1[0xC6]); } // dump bytes
 
-            P += 1; // advance Program Counter
+            P += opBytesP1[0xC6]; // advance Program Counter
             disSB.Append(String.Format("VEJ  (C6){0}", Environment.NewLine));
             //tick += 17;
         }
@@ -4524,23 +5270,15 @@ namespace lh5801_Dis
         /// </summary>
          public void VHS_n()
         {
+            ushort startP = P;
             P += 1; // advance Program Counter
-            byte numBytes = 2;
             string args = "";
 
-            if (disModePC1500)
-            {
-                args = VectorIndex(0xC7, out numBytes);
-                numBytes += 1;
-            }
-            else
-            {
-                byte value = GetByte(); // P += 1
-                args = String.Format("${0:X2}", value);
-            }
+            byte value = GetByte(); // P += 1
+            if (disModePC1500) { args = VectorIndex(value); }
 
-            if (listFormat) { LineDump((ushort)(P - numBytes), numBytes); } // dump bytes
-            disSB.Append(String.Format("VHS  {0}{1}", args, Environment.NewLine));
+            if (listFormat) { LineDump(startP, (ushort)(P - startP)); } // dump bytess
+            disSB.Append(String.Format("VHS  (${0:X2}){1}{2}", value, args, Environment.NewLine));
         }
 
         /// <summary>
@@ -4549,23 +5287,16 @@ namespace lh5801_Dis
         /// Opcode C8, Bytes 1
         /// </summary>
         /// VEJ (C8),o1 - For PC-1500 arguments follow this opcode
-        /// Syntax check: Jump fwd (o1) if following character doesn’t represent 
-        /// end to command sequence or line. C=1 if ":"
+        /// PC-1500: Arguments Type 2, ABRF
         public void VEJ_C8()
         {
-            P += 1; // advance Program Counter
-            Tuple<String, byte> retValues = new Tuple<String, byte>("", 1);
-            byte numBytes = opBytesP1[0xC8];
+            ushort startP = P;      // starting value of P
+            P += opBytesP1[0xC8]; // advance Program Counter
             String args = "";
 
-            if (disModePC1500)
-            {
-                numBytes += 1;
-                retValues = VEJ_o1(numBytes);
-                args = String.Format(",{0}", retValues.Item1);
-            }
+            if (disModePC1500) { args = VECARG_T2(); }
 
-            if (listFormat) { LineDump((ushort)(P - numBytes), numBytes); } // dump bytes
+            if (listFormat) { LineDump(startP, (ushort)(P - startP)); } // dump bytes
             disSB.Append(String.Format("VEJ  (C8){0}{1}", args, Environment.NewLine));
             //tick += 17;
         }
@@ -4577,23 +5308,15 @@ namespace lh5801_Dis
         /// </summary>
         public void VZR_n()
         {
+            ushort startP = P;
             P += 1; // advance Program Counter
-            byte numBytes = 2;
             string args = "";
 
-            if (disModePC1500)
-            {
-                args = VectorIndex(0xC9, out numBytes);
-                numBytes += 1;
-            }
-            else
-            {
-                byte value = GetByte(); // P += 1
-                args = String.Format("${0:X2}", value);
-            }
+            byte value = GetByte(); // P += 1
+            if (disModePC1500) { args = VectorIndex(value); }
 
-            if (listFormat) { LineDump((ushort)(P - numBytes), numBytes); } // dump bytes
-            disSB.Append(String.Format("VZR  {0}{1}", args, Environment.NewLine));
+            if (listFormat) { LineDump(startP, (ushort)(P - startP)); } // dump bytess
+            disSB.Append(String.Format("VZR  (${0:X2}){1}{2}", value, args, Environment.NewLine));
         }
 
         /// <summary>
@@ -4601,24 +5324,17 @@ namespace lh5801_Dis
         /// Vectored Call, $FF CA
         /// Opcode CA, Bytes 1
         /// </summary>
-        /// VEJ (CA),b1 - For PC-1500 arguments follow this opcode
+        /// PC-1500: Arguments Type 1 ABYTL
         /// Transfers X to 78(b1), 78(b1+1)
         public void VEJ_CA()
         {
-            P += 1; // advance Program Counter
-            Tuple<String, byte> retValues = new Tuple<String, byte>("", 1);
+            ushort startP = P;      // starting value of P
+            P += opBytesP1[0xCA]; // advance Program Counter
             String args = "";
 
-            byte numBytes = opBytesP1[0xCA];
+            if (disModePC1500) { args = VECARG_T1(); }
 
-            if (disModePC1500)
-            {
-                numBytes += 1;
-                retValues = VEJ_78b1(numBytes);
-                args = String.Format(",{0}", retValues.Item1);
-            }
-
-            if (listFormat) { LineDump((ushort)(P - numBytes), numBytes); } // dump bytes
+            if (listFormat) { LineDump(startP, (ushort)(P - startP)); } // dump bytes
             disSB.Append(String.Format("VEJ  (CA){0}{1}", args, Environment.NewLine));
             //tick += 17;
         }
@@ -4630,23 +5346,15 @@ namespace lh5801_Dis
         /// </summary>
         public void VZS_n()
         {
+            ushort startP = P;
             P += 1; // advance Program Counter
-            byte numBytes = 2;
             string args = "";
 
-            if (disModePC1500)
-            {
-                args = VectorIndex(0xCB, out numBytes);
-                numBytes += 1;
-            }
-            else
-            {
-                byte value = GetByte(); // P += 1
-                args = String.Format("${0:X2}", value);
-            }
+            byte value = GetByte(); // P += 1
+            if (disModePC1500) { args = VectorIndex(value); }
 
-            if (listFormat) { LineDump((ushort)(P - numBytes), numBytes); } // dump bytes
-            disSB.Append(String.Format("VZS  {0}{1}", args, Environment.NewLine));
+            if (listFormat) { LineDump(startP, (ushort)(P - startP)); } // dump bytess
+            disSB.Append(String.Format("VZS  (${0:X2}){1}{2}", value, args, Environment.NewLine));
         }
 
         /// <summary>
@@ -4654,24 +5362,17 @@ namespace lh5801_Dis
         /// Vectored Call, $FF CC
         /// Opcode CC, Bytes 1
         /// </summary>
-        /// VEJ (CC),b1 - For PC-1500 arguments follow this opcode
-        /// Transfers X to 78(b1), 78(b1+1)
+        /// PC-1500: Arguments Type 1 ABYTL
+        /// Loads X from 78(b1), 78(b1+1)
         public void VEJ_CC()
         {
-            P += 1; // advance Program Counter
-            Tuple<String, byte> retValues = new Tuple<String, byte>("", 1);
+            ushort startP = P;      // starting value of P
+            P += opBytesP1[0xCC];   // advance Program Counter
             String args = "";
 
-            byte numBytes = opBytesP1[0xCC];
+            if (disModePC1500) { args = VECARG_T1(); }
 
-            if (disModePC1500)
-            {
-                numBytes += 1;
-                retValues = VEJ_78b1(numBytes);
-                args = String.Format(",{0}", retValues.Item1);
-            }
-
-            if (listFormat) { LineDump((ushort)(P - numBytes), numBytes); } // dump bytes
+            if(listFormat) { LineDump(startP, (ushort)(P - startP)); } // dump bytes
             disSB.Append(String.Format("VEJ  (CC){0}{1}", args, Environment.NewLine));
             //tick += 17;
         }
@@ -4683,24 +5384,15 @@ namespace lh5801_Dis
         /// </summary>
         public void VMJ_n()
         {
+            ushort startP = P;
             P += 1; // advance Program Counter
-            byte numBytes = 2;
             string args = "";
 
-            if (disModePC1500)
-            {
-                //VectorIndex appends 
-                args = VectorIndex(0xCD, out numBytes);
-                numBytes += 1;
-            }
-            else
-            {
-                byte value = GetByte(); // P += 1
-                args = String.Format("${0:X2}", value);
-            }
+            byte value = GetByte(); // P += 1
+            if (disModePC1500) { args = VectorIndex(value); }
 
-            if (listFormat) { LineDump((ushort)(P - numBytes), numBytes); } // dump bytes
-            disSB.Append(String.Format("VMJ  {0}{1}", args, Environment.NewLine));
+            if (listFormat) { LineDump(startP, (ushort)(P - startP)); } // dump bytess
+            disSB.Append(String.Format("VMJ  (${0:X2}){1}{2}", value, args, Environment.NewLine));
         }
 
         /// <summary>
@@ -4708,24 +5400,17 @@ namespace lh5801_Dis
         /// Vectored Call, $FF CE
         /// Opcode CE, Bytes 1
         /// </summary>
-        /// VEJ (CE),b1,o2 - For PC-1500 arguments follow this opcode
-        /// Determines address of variable 'n1'  if not numeric, branch to P+n2
+        /// PC-1500: Arguments Type 3 ABYT, ABRF     
+        /// Determines address of variable 'n1' if not numeric, branch to P+n2
         public void VEJ_CE()
         {
-            P += 1; // advance Program Counter
-            Tuple<String, byte> retValues = new Tuple<String, byte>("", 1);
+            ushort startP = P;
+            P += opBytesP1[0xC4]; // advance Program Counter
             String args = "";
 
-            byte numBytes = opBytesP1[0xCE];
+            if (disModePC1500) { args = VECARG_T3(); }
 
-            if (disModePC1500)
-            {
-                numBytes += 2;
-                retValues = VEJ_b1_o1(numBytes);
-                args = String.Format(",{0}", retValues.Item1);
-            }
-
-            if (listFormat) { LineDump((ushort)(P - numBytes), numBytes); } // dump bytes
+            if (listFormat) { LineDump(startP, (ushort)(P - startP)); } // dump bytes
             disSB.Append(String.Format("VEJ  (CE){0}{1}", args, Environment.NewLine));
             //tick += 17;
         }
@@ -4737,23 +5422,15 @@ namespace lh5801_Dis
         /// </summary>
         public void VVS_n()
         {
+            ushort startP = P;
             P += 1; // advance Program Counter
-            byte numBytes = 2;
             string args = "";
 
-            if (disModePC1500)
-            {
-                args = VectorIndex(0xCF, out numBytes);
-                numBytes += 1;
-            }
-            else
-            {
-                byte value = GetByte(); // P += 1
-                args = String.Format("${0:X2}", value);
-            }
+            byte value = GetByte(); // P += 1
+            if (disModePC1500) { args = VectorIndex(value); }
 
-            if (listFormat) { LineDump((ushort)(P - numBytes), numBytes); } // dump bytes
-            disSB.Append(String.Format("VVS  {0}{1}", args, Environment.NewLine));
+            if (listFormat) { LineDump(startP, (ushort)(P - startP)); } // dump bytess
+            disSB.Append(String.Format("VVS  (${0:X2}){1}{2}", value, args, Environment.NewLine));
         }
 
         #endregion Opcodes_0xC0-0xCF
@@ -4765,24 +5442,17 @@ namespace lh5801_Dis
         /// Vectored Call, $FF D0
         /// Opcode D0, Bytes 1
         /// </summary>
-        /// VEJ (D0),p,n - For PC-1500 arguments follow this opcode
-        /// Convert AR-X to integer & load to U-Reg.  If range 'p' exceeded, then branch fwd n
+        /// PC-1500: Arguments Type 3 ABYT, ABRF
+        /// Convert AR-X to integer & save to U-Reg.  If range 'p' exceeded, then branch fwd n
         public void VEJ_D0()
-        {
-            P += 1; // advance Program Counter
-            Tuple<String, byte> retValues = new Tuple<String, byte>("", 1);
+        {   
+            ushort startP = P;
+            P += opBytesP1[0xD0]; // advance Program Counter
             String args = "";
 
-            byte numBytes = opBytesP1[0xD0];
+            if (disModePC1500) { args = VECARG_T3(); }
 
-            if (disModePC1500)
-            {
-                numBytes += 2;
-                retValues = VEJ_b1_o1(numBytes);
-                args = String.Format(",{0}", retValues.Item1);
-            }
-
-            if (listFormat) { LineDump((ushort)(P - numBytes), numBytes); } // dump bytes
+            if (listFormat) { LineDump(startP, (ushort)(P - startP)); } // dump bytes
             disSB.Append(String.Format("VEJ  (D0){0}{1}", args, Environment.NewLine));
             //tick += 17;
         }
@@ -4806,24 +5476,17 @@ namespace lh5801_Dis
         /// Vectored Call, $FF D2
         /// Opcode D2, Bytes 1
         /// </summary>
-        /// VEJ (D2),n1,n2 - For PC-1500 arguments follow this opcode
+        /// PC-1500: Arguments Type 4 ABRF, ABYT
         /// Convert AR-X to integer & load to U-Reg.  If range 'p' exceeded, then branch fwd n
         public void VEJ_D2()
         {
-            P += 1; // advance Program Counter
-            Tuple<String, byte> retValues = new Tuple<String, byte>("", 1);
+            ushort startP = P;
+            P += opBytesP1[0xD2]; // advance Program Counter
             String args = "";
 
-            byte numBytes = opBytesP1[0xD2];
+            if (disModePC1500) { args = VECARG_T4(); }
 
-            if (disModePC1500)
-            {
-                numBytes += 2;
-                retValues = VEJ_b1_b2(numBytes);
-                args = String.Format(",{0}", retValues.Item1);
-            }
-
-            if (listFormat) { LineDump((ushort)(P - numBytes), numBytes); } // dump bytes
+            if (listFormat) { LineDump(startP, (ushort)(P - startP)); } // dump bytes
             disSB.Append(String.Format("VEJ  (D2){0}{1}", args, Environment.NewLine));
             //tick += 17;
         }
@@ -4848,25 +5511,18 @@ namespace lh5801_Dis
         /// Vectored Call, $FF D4
         /// Opcode D4, Bytes 1
         /// </summary>
-        /// VEJ (D4),n - For PC-1500 arguments follow this opcode
-        /// Copies pointer for current Processing status 
+        /// PC-1500: Type 9 ABYT
+        /// Read current Processing status 
         /// of program in memory. A0=Program AC=Break B2=Error
         public void VEJ_D4()
         {
-            P += 1; // advance Program Counter
-            Tuple<String, byte> retValues = new Tuple<String, byte>("", 1);
+            ushort startP = P;
+            P += opBytesP1[0xD4]; ; // advance Program Counter
             String args = "";
 
-            byte numBytes = opBytesP1[0xD4];
+            if (disModePC1500){ args = VECARG_T9(); }
 
-            if (disModePC1500)
-            {
-                numBytes += 1;
-                retValues = VEJ_b1(numBytes);
-                args = String.Format(",{0}", retValues.Item1);
-            }
-
-            if (listFormat) { LineDump((ushort)(P - numBytes), numBytes); } // dump bytes
+            if (listFormat) { LineDump(startP, (ushort)(P - startP)); } // dump bytes
             disSB.Append(String.Format("VEJ  (D4){0}{1}", args, Environment.NewLine));
             //tick += 17;
         }
@@ -4890,24 +5546,18 @@ namespace lh5801_Dis
         /// Vectored Call, $FF D6
         /// Opcode D6, Bytes 1
         /// </summary>
-        /// VEJ (D6),n - For PC-1500 arguments follow this opcode
+        /// PC-1500: Arguments Type 9 ABYT
         /// Loads address pointer from memory to AR-Y A6=PROGRAM AC=BREAK B8=ON ERROR
         public void VEJ_D6()
         {
-            P += 1; // advance Program Counter
-            Tuple<String, byte> retValues = new Tuple<String, byte>("", 1);
+            ushort startP = P;
+            P += opBytesP1[0xD6]; // advance Program Counter
             String args = "";
-            
-            byte numBytes = opBytesP1[0xD6];
 
             if (disModePC1500)
-            {
-                numBytes += 1;
-                retValues = VEJ_b1(numBytes);
-                args = String.Format(",{0}", retValues.Item1);
-            }
+            { args = VECARG_T9(); }
 
-            if (listFormat) { LineDump((ushort)(P - numBytes), numBytes); } // dump bytes
+            if (listFormat) { LineDump(startP, (ushort)(P - startP)); } // dump bytes
             disSB.Append(String.Format("VEJ  (D6){0}{1}", args, Environment.NewLine));
             //tick += 17;
         }
@@ -4922,7 +5572,7 @@ namespace lh5801_Dis
         {
             if (listFormat) { LineDump(P, opBytesP1[0xD1]); } // dump bytes
 
-            P += 1; // advance Program Counter
+            P += opBytesP1[0xD1]; // advance Program Counter
             disSB.Append(String.Format("DRL  (X){0}", Environment.NewLine));
             //tick += 12;
         }
@@ -4931,12 +5581,13 @@ namespace lh5801_Dis
         /// VEJ (D8)
         /// Vectored Call, $FF D8
         /// Opcode D8, Bytes 1
+        /// PC-1500: Arguments Type 0, none
         /// </summary>
         public void VEJ_D8()
         {
             if (listFormat) { LineDump(P, opBytesP1[0xD8]); } // dump bytes
 
-            P += 1; // advance Program Counter
+            P += opBytesP1[0xD8]; // advance Program Counter
             disSB.Append(String.Format("VEJ  (D8){0}", Environment.NewLine));
             //tick += 17;
         }
@@ -4950,7 +5601,7 @@ namespace lh5801_Dis
         {
             if (listFormat) { LineDump(P, opBytesP1[0xD9]); } // dump bytes
 
-            P += 1; // advance Program Counter
+            P += opBytesP1[0xD9]; // advance Program Counter
             disSB.Append(String.Format("SHL{0}", Environment.NewLine));
             //tick += 6;
         }
@@ -4959,6 +5610,7 @@ namespace lh5801_Dis
         /// VEJ (DA)
         /// Vectored Call, $FF DA
         /// Opcode DA, Bytes 1
+        /// PC-1500: Arguments Type 0, none
         /// </summary>
         public void VEJ_DA()
         {
@@ -4987,6 +5639,7 @@ namespace lh5801_Dis
         /// VEJ (DC)
         /// Vectored Call, $FF DC
         /// Opcode DC, Bytes 1
+        /// PC-1500: Arguments Type 0, none
         /// </summary>
         public void VEJ_DC()
         {
@@ -5016,25 +5669,18 @@ namespace lh5801_Dis
         /// Vectored Call, $FF DE
         /// Opcode DE, Bytes 1
         /// </summary>
-        /// VEJ (DE),n - For PC-1500 arguments follow this opcode
+        /// PC-1500: Arguments Type 2 ABRF
         /// Calculates formula to which Y-Reg points and passes 
         /// result to AR-X. Jump FWD (n) if error
         public void VEJ_DE()
         {
-            P += 1; // advance Program Counter
-            Tuple<String, byte> retValues = new Tuple<String, byte>("", 1);
+            ushort startP = P;
+            P += opBytesP1[0xDE]; // advance Program Counter
             String args = "";
 
-            byte numBytes = opBytesP1[0xDE];
+            if (disModePC1500) { args = VECARG_T2(); }
 
-            if (disModePC1500)
-            {
-                numBytes += 1;
-                retValues = VEJ_o1(numBytes);
-                args = String.Format(",{0}", retValues.Item1);
-            }
-
-            if (listFormat) { LineDump((ushort)(P - numBytes), numBytes); } // dump bytes
+            if (listFormat) { LineDump(startP, (ushort)(P - startP)); } // dump bytes
             disSB.Append(String.Format("VEJ  (DE){0}{1}", args, Environment.NewLine));
             //tick += 17;
         }
@@ -5061,6 +5707,7 @@ namespace lh5801_Dis
         /// VEJ (E0)
         /// Vectored Call, $FF E0
         /// Opcode E0, Bytes 1
+        /// PC-1500: Arguments Type 0, none
         /// </summary>
         public void VEJ_E0()
         {
@@ -5089,6 +5736,7 @@ namespace lh5801_Dis
         /// VEJ (E2)
         /// Vectored Call, $FF E2
         /// Opcode E2, Bytes 1
+        /// PC-1500: Arguments Type 0, none
         /// </summary>
         public void VEJ_E2()
         {
@@ -5117,6 +5765,7 @@ namespace lh5801_Dis
         /// VEJ (E4)
         /// Vectored Call, $FF E4
         /// Opcode E4, Bytes 1
+        /// PC-1500: Arguments Type 0, none
         /// </summary>
         public void VEJ_E4()
         {
@@ -5131,6 +5780,7 @@ namespace lh5801_Dis
         /// VEJ (E6)
         /// Vectored Call, $FF E6
         /// Opcode E6, Bytes 1
+        /// PC-1500: Arguments Type 0, none
         /// </summary>
         public void VEJ_E6()
         {
@@ -5145,6 +5795,7 @@ namespace lh5801_Dis
         /// VEJ (E8)
         /// Vectored Call, $FF E8
         /// Opcode E8, Bytes 1
+        /// PC-1500: Arguments Type 0, none
         /// </summary>
         public void VEJ_E8()
         {
@@ -5175,6 +5826,7 @@ namespace lh5801_Dis
         /// VEJ (EA)
         /// Vectored Call, $FF EA
         /// Opcode EA, Bytes 1
+        /// PC-1500: Arguments Type 0, none
         /// </summary>
         public void VEJ_EA()
         {
@@ -5205,6 +5857,7 @@ namespace lh5801_Dis
         /// VEJ (EC)
         /// Vectored Call, $FF EC
         /// Opcode EC, Bytes 1
+        /// PC-1500: Arguments Type 0, none
         /// </summary>
         public void VEJ_EC()
         {
@@ -5235,6 +5888,7 @@ namespace lh5801_Dis
         /// VEJ (EE)
         /// Vectored Call, $FF EE
         /// Opcode EE, Bytes 1
+        /// PC-1500: Arguments Type 0, none
         /// </summary>
         public void VEJ_EE()
         {
@@ -5269,6 +5923,7 @@ namespace lh5801_Dis
         /// VEJ (F0)
         /// Vectored Call, $FF F0
         /// Opcode F0, Bytes 1
+        /// PC-1500: Arguments Type 0, none
         /// </summary>
         public void VEJ_F0()
         {
@@ -5297,6 +5952,7 @@ namespace lh5801_Dis
         /// VEJ (F2)
         /// Vectored Call, $FF F2
         /// Opcode F2, Bytes 1
+        /// PC-1500: Arguments Type 0, none
         /// </summary>
         public void VEJ_F2()
         {
@@ -5312,24 +5968,18 @@ namespace lh5801_Dis
         /// Vectored Call, $FF F4
         /// Opcode F4, Bytes 1
         /// </summary>
-        /// VEJ (F4),pp - For PC-1500 arguments follow this opcode
+        /// PC-1500: Arguments Type 10 AWRD
         /// Loads U-Reg with 16-bit value from address of (pp)
         public void VEJ_F4()
         {
-            P += 1; // advance Program Counter
-            Tuple<String, byte> retValues = new Tuple<String, byte>("", 1);
+            ushort startP = P;
+            P += opBytesP1[0xF4]; // advance Program Counter
             String args = "";
 
-            byte numBytes = opBytesP1[0xF4];
 
-            if (disModePC1500)
-            {
-                numBytes += 2;
-                retValues = VEJ_w1(numBytes);
-                args = String.Format(",{0}", retValues.Item1);
-            }
+            if (disModePC1500) { args = VECARG_T10(); }
 
-            if (listFormat) { LineDump((ushort)(P - numBytes), numBytes); } // dump bytes
+            if (listFormat) { LineDump(startP, (ushort)(P - startP)); } // dump bytes
             disSB.Append(String.Format("VEJ  (F4){0}{1}", args, Environment.NewLine));
             //tick += 17;
         }
@@ -5353,24 +6003,17 @@ namespace lh5801_Dis
         /// Vectored Call, $FF F6
         /// Opcode F6, Bytes 1
         /// </summary>
-        /// VEJ (F6),pp - For PC-1500 arguments follow this opcode
+        /// PC-1500: Arguments Type 10
         /// Transfers U to pp, pp+1
         public void VEJ_F6()
         {
-            P += 1; // advance Program Counter
-            Tuple<String, byte> retValues = new Tuple<String, byte>("", 1);
+            ushort startP = P;
+            P += opBytesP1[0xF6]; // advance Program Counter
             String args = "";
 
-            byte numBytes = opBytesP1[0xF6];
+            if (disModePC1500) { args = VECARG_T10(); }
 
-            if (disModePC1500)
-            {
-                numBytes += 2;
-                retValues = VEJ_w1(numBytes);
-                args = String.Format(",{0}", retValues.Item1);
-            }
-
-            if (listFormat) { LineDump((ushort)(P - numBytes), numBytes); } // dump bytes
+            if (listFormat) { LineDump(startP, (ushort)(P - startP)); } // dump bytes
             disSB.Append(String.Format("VEJ  (F6){0}{1}", args, Environment.NewLine));
             //tick += 17;
         }
@@ -5393,6 +6036,7 @@ namespace lh5801_Dis
         /// VEJ (F8)
         /// Vectored Call, $FF F8
         /// Opcode F8, Bytes 1
+        /// PC-1500: Arguments Type 0, none
         /// </summary>
         public void VEJ_F8()
         {
@@ -5421,6 +6065,7 @@ namespace lh5801_Dis
         /// VEJ (FA)
         /// Vectored Call, $FF FA
         /// Opcode FA, Bytes 1
+        /// PC-1500: Arguments Type 0, none
         /// </summary>
         public void VEJ_FA()
         {
@@ -5449,6 +6094,7 @@ namespace lh5801_Dis
         /// VEJ (FC)
         /// Vectored Call, $FF FC
         /// Opcode FC, Bytes 1
+        /// PC-1500: Arguments Type 0, none
         /// </summary>
         public void VEJ_FC()
         {
@@ -5475,6 +6121,7 @@ namespace lh5801_Dis
         /// VEJ (FE)
         /// Vectored Call, $FF FE
         /// Opcode FE, Bytes 1
+        /// PC-1500: Arguments Type 0, none
         /// </summary>
         public void VEJ_FE()
         {

@@ -18,7 +18,7 @@ namespace lh5801_Dis
     {
         lh5801_Emu.Dis_Window DumpWin = new lh5801_Emu.Dis_Window();
 
-        lh5801_Dis CPU = new lh5801_Dis();
+        lh5801_Dis CPU;
         private System.ComponentModel.Design.ByteViewer byteviewer;
         System.Text.RegularExpressions.Regex isHexSpc = new System.Text.RegularExpressions.Regex("^[a-fA-F0-9\\s]+$");
         System.Text.RegularExpressions.Regex isHexSpcKey = new System.Text.RegularExpressions.Regex("^[a-fA-F0-9\\s\\b\\cA\\cC\\cV\\cX]+$");
@@ -27,7 +27,6 @@ namespace lh5801_Dis
 
         private readonly SynchronizationContext synchronizationContext;
         private DateTime previousTime = DateTime.Now;
-        uint lastTick = 0; // used to keep track of clock speed
 
         /// <summary>
         /// You guessed it, the constructor!
@@ -35,6 +34,7 @@ namespace lh5801_Dis
         public Form1()
         {
             InitializeComponent();
+            CPU = new lh5801_Dis(tbStatus);
             synchronizationContext = SynchronizationContext.Current;
 
             byteviewer = new ByteViewer();
@@ -47,7 +47,6 @@ namespace lh5801_Dis
             updateUI();
         }
 
-
         /// <summary>
         /// Update Text Boxes and Check Boxes
         /// </summary>
@@ -56,6 +55,13 @@ namespace lh5801_Dis
             tbDisStart.Text = tbDisStart.Text.ToUpper();
             tbDisEnd.Text = tbDisEnd.Text.ToUpper();
             tbAddress.Text = tbAddress.Text.ToUpper();
+
+            cbPC1500.Checked     = CPU.disModePC1500;
+            cbUseLibFile.Checked = CPU.addressLabels;
+            cbUseLibFile.Checked = CPU.libFileEnable;
+            cbListFormat.Checked = CPU.listFormat;
+            cbOutputFile.Checked = CPU.outputFile;
+
             byteviewer.Refresh();
         }
 
@@ -68,7 +74,7 @@ namespace lh5801_Dis
         /// <param name="e"></param>
         private void btnStep_Click(object sender, EventArgs e)
         {
-            //CPU.Run();
+            CPU.quickTest();
             //updateUI();
         }
 
@@ -318,6 +324,35 @@ namespace lh5801_Dis
             updateUI();
         }
 
+        private void cbPC1500_CheckedChanged(object sender, EventArgs e)
+        {
+            CPU.disModePC1500 = cbPC1500.Checked;
+            updateUI();
+        }
+
+        private void cbUseLibFile_CheckedChanged(object sender, EventArgs e)
+        {
+            CPU.libFileEnable = cbUseLibFile.Checked;
+            updateUI();
+        }
+
+        private void chUseLables_CheckedChanged(object sender, EventArgs e)
+        {
+            CPU.addressLabels = cbUseLables.Checked;
+            updateUI();
+        }
+
+        private void cbListFormat_CheckedChanged(object sender, EventArgs e)
+        {
+            CPU.listFormat = cbListFormat.Checked;
+            updateUI();
+        }
+
+        private void cbOutputFile_CheckedChanged(object sender, EventArgs e)
+        {
+            CPU.outputFile = cbOutputFile.Checked;
+        }
+
         #endregion Registers and HEX Dump
 
         #region Load / Save
@@ -332,39 +367,26 @@ namespace lh5801_Dis
         {
             System.Windows.Forms.OpenFileDialog openFileDialog1;
             openFileDialog1 = new System.Windows.Forms.OpenFileDialog();
+            openFileDialog1.Filter = "bin files (*.bin)|*bin|All Files (*.*)|*.*";
 
             if (openFileDialog1.ShowDialog() == DialogResult.OK && openFileDialog1.CheckFileExists == true)
             {
                 string inputFile = openFileDialog1.FileName;
+                string result;
+                bool success = CPU.LoadBinFile(inputFile, out result, (ushort)Convert.ToInt16(tbAddress.Text, 16), rbME0.Checked);
 
-                FileStream inputfs = new FileStream(inputFile, FileMode.Open, FileAccess.Read);
-                BinaryReader fileReader = new BinaryReader(inputfs);
-                long fileSize = inputfs.Length;
-                ushort targetAddress = (ushort)Convert.ToInt16(tbAddress.Text, 16);
-                ushort spaceLeft = (ushort)(0xFFFF - targetAddress);
-
-                if (fileSize > spaceLeft)
+                if (result != "")
                 {
-                    string message = "File too large";
-                    string title = "Oops!";
-                    MessageBox.Show(message, title);
+                    tbStatus.AppendText(result);
                 }
-                else
+                
+                if (success)
                 {
-                    for (long i = 0; i < fileSize; i++)
-                    {
-                        if (rbME0.Checked)
-                        {
-                            CPU.RAM_ME0[targetAddress + i] = fileReader.ReadByte();
-                        }
-                        else
-                        {
-                            CPU.RAM_ME1[targetAddress + i] = fileReader.ReadByte();
-                        }
-
-                    }
-                    tmrUpdate.Enabled = true;
+                    cbUseLibFile.Checked = true;
+                    cbUseLables.Checked = true;
                 }
+
+                tmrUpdate.Enabled = true;
             }
         }
 
@@ -375,35 +397,33 @@ namespace lh5801_Dis
         /// <param name="e"></param>
         private void btnSave_Click(object sender, EventArgs e)
         {
+            string result = "";
+
             System.Windows.Forms.SaveFileDialog saveFileDialog1;
             saveFileDialog1 = new System.Windows.Forms.SaveFileDialog();
+            saveFileDialog1.Filter = "bin files (*.bin)|*bin|All Files (*.*)|*.*";
 
-            if (saveFileDialog1.ShowDialog() == DialogResult.OK && saveFileDialog1.CheckFileExists == true)
+            if (saveFileDialog1.ShowDialog() == DialogResult.OK)
             {
-                string outputFile = saveFileDialog1.FileName;
-                long fileSize = 0xFFFF;
+                string fileName = saveFileDialog1.FileName;
+                ushort startAddress = (ushort)Convert.ToInt16(tbDisStart.Text, 16);
+                ushort endAddress = (ushort)Convert.ToInt16(tbDisEnd.Text, 16);
 
-                FileStream outputfs = new FileStream(outputFile, FileMode.Create);
-                BinaryWriter fileWriter = new BinaryWriter(outputfs);
+                result = CPU.SaveBinFile(fileName, startAddress, endAddress, rbME0.Checked);
 
-                for (long i = 0; i < fileSize; i++)
-                {
-                    if (rbME0.Checked)
-                    {
-                        fileWriter.Write((byte)CPU.RAM_ME0[i]);
-                    }
-                    else
-                    {
-                        fileWriter.Write((byte)CPU.RAM_ME1[i]);
-                    }
-                }
-
+                if (result == "") { result = "File Saved"; }
+                tbStatus.AppendText(result);
                 tmrUpdate.Enabled = true;
             }
         }
 
+
         #endregion Load / Save
 
+        public void statusWrite(string text)
+        {
+            tbStatus.Text += text;
+        }
 
     }
 }

@@ -1,5 +1,7 @@
 ﻿using System;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
+using System.Collections.Generic;
+using ExtensionMethods;
 using lh5801_Dis;
 
 namespace lh5801_Dis_Test
@@ -813,7 +815,7 @@ namespace lh5801_Dis_Test
 
             CPU.Run((ushort)(address + 0x0C), (ushort)(address + 0x0C));
             output = CPU.DisDump();
-            match = "100C   88 1E                      LOP UL,$0FF0\r\n";
+            match = "100C   88 1E                      LOP  UL,$0FF0\r\n";
             Assert.AreEqual(match, output, "LOP UL,$0FF0");
 
             CPU.Run((ushort)(address + 0xE), (ushort)(address + 0xE));
@@ -1152,7 +1154,7 @@ namespace lh5801_Dis_Test
 
             CPU.Run((ushort)(address + 1), (ushort)(address + 1));
             output = CPU.DisDump();
-            match = "1001   C1 1A                      VCR  $1A\r\n";
+            match = "1001   C1 1A                      VCR  ($1A)\r\n";
             Assert.AreEqual(match, output, "VCR  $1A");
 
             CPU.Run((ushort)(address + 3), (ushort)(address + 3));
@@ -1162,7 +1164,7 @@ namespace lh5801_Dis_Test
 
             CPU.Run((ushort)(address + 4), (ushort)(address + 4));
             output = CPU.DisDump();
-            match = "1004   C3 1B                      VCS  $1B\r\n";
+            match = "1004   C3 1B                      VCS  ($1B)\r\n";
             Assert.AreEqual(match, output, "VCS  $1B");
 
             CPU.Run((ushort)(address + 6), (ushort)(address + 6));
@@ -1172,7 +1174,7 @@ namespace lh5801_Dis_Test
 
             CPU.Run((ushort)(address + 7), (ushort)(address + 7));
             output = CPU.DisDump();
-            match = "1007   C5 1C                      VHR  $1C\r\n";
+            match = "1007   C5 1C                      VHR  ($1C)\r\n";
             Assert.AreEqual(match, output, "VHR  $1C");
 
             CPU.Run((ushort)(address + 9), (ushort)(address + 9));
@@ -1182,7 +1184,7 @@ namespace lh5801_Dis_Test
 
             CPU.Run((ushort)(address + 0x0A), (ushort)(address + 0x0A));
             output = CPU.DisDump();
-            match = "100A   C7 1D                      VHS  $1D\r\n";
+            match = "100A   C7 1D                      VHS  ($1D)\r\n";
             Assert.AreEqual(match, output, "VHS  $1D");
 
             CPU.Run((ushort)(address + 0xC), (ushort)(address + 0xC));
@@ -1192,7 +1194,7 @@ namespace lh5801_Dis_Test
 
             CPU.Run((ushort)(address + 0x0D), (ushort)(address + 0x0D));
             output = CPU.DisDump();
-            match = "100D   C9 1E                      VZR  $1E\r\n";
+            match = "100D   C9 1E                      VZR  ($1E)\r\n";
             Assert.AreEqual(match, output, "VZR  $1E");
 
             CPU.Run((ushort)(address + 0x0F), (ushort)(address + 0x0F));
@@ -1202,7 +1204,7 @@ namespace lh5801_Dis_Test
 
             CPU.Run((ushort)(address + 0x10), (ushort)(address + 0x10));
             output = CPU.DisDump();
-            match = "1010   CB 1F                      VZS  $1F\r\n";
+            match = "1010   CB 1F                      VZS  ($1F)\r\n";
             Assert.AreEqual(match, output, "VZS  $1F");
 
             CPU.Run((ushort)(address + 0x12), (ushort)(address + 0x12));
@@ -1212,7 +1214,7 @@ namespace lh5801_Dis_Test
 
             CPU.Run((ushort)(address + 0x13), (ushort)(address + 0x13));
             output = CPU.DisDump();
-            match = "1013   CD 20                      VMJ  $20\r\n";
+            match = "1013   CD 20                      VMJ  ($20)\r\n";
             Assert.AreEqual(match, output, "VMJ  $20");
 
             CPU.Run((ushort)(address + 0x15), (ushort)(address + 0x15));
@@ -1222,7 +1224,7 @@ namespace lh5801_Dis_Test
 
             CPU.Run((ushort)(address + 0x16), (ushort)(address + 0x16));
             output = CPU.DisDump();
-            match = "1016   CF 21                      VVS  $21\r\n";
+            match = "1016   CF 21                      VVS  ($21)\r\n";
             Assert.AreEqual(match, output, "VVS  $21");
         }
 
@@ -1251,37 +1253,37 @@ namespace lh5801_Dis_Test
 
             CPU.Run((ushort)(address + 0x01), (ushort)(address + 0x01));
             output = CPU.DisDump();
-            match = "1001   C1 00 01 08 11             VCR  ($00),$01,$08,$1017\r\n";
+            match = "1001   C1 00 01 08 11             VCR  ($00) \\ ABYT($01) \\ ABYT($08) \\ ABRF($1017)\r\n";
             Assert.AreEqual(match, output, "VCR  ($00),$01,$08,$1017");
 
             CPU.Run((ushort)(address + 0x06), (ushort)(address + 0x06));
             output = CPU.DisDump();
-            match = "1006   C2 30 31                   VEJ  (C2),$30,$103A\r\n";
+            match = "1006   C2 30 31                   VEJ  (C2) \\ ACHR($30) \\ ABRF($103A)\r\n";
             Assert.AreEqual(match, output, "VEJ  (C2),$30,$103A");
 
             CPU.Run((ushort)(address + 0x09), (ushort)(address + 0x09));
             output = CPU.DisDump();
-            match = "1009   C2 F1 AE 07                VEJ  (C2),$F1AE,$1014\r\n";
+            match = "1009   C2 F1 AE 07                VEJ  (C2) \\ AWRD($F1AE) \\ ABRF($1014)\r\n";
             Assert.AreEqual(match, output, "VEJ  (C2),$F1AE,$07");
 
             CPU.Run((ushort)(address + 0x0D), (ushort)(address + 0x0D));
             output = CPU.DisDump();
-            match = "100D   C3 04 AA                   VCS  ($04),$10BA\r\n";
+            match = "100D   C3 04 AA                   VCS  ($04) \\ ABRF($10BA)\r\n";
             Assert.AreEqual(match, output, "VCS  ($04),$10BA");
 
             CPU.Run((ushort)(address + 0x10), (ushort)(address + 0x10));
             output = CPU.DisDump();
-            match = "1010   C4 2C 1A                   VEJ  (C4),$2C,$102D\r\n";
+            match = "1010   C4 2C 1A                   VEJ  (C4) \\ ACHR($2C) \\ ABRF($102D)\r\n";
             Assert.AreEqual(match, output, "VEJ  (C4),$2C,$102D");
 
             CPU.Run((ushort)(address + 0x13), (ushort)(address + 0x13));
             output = CPU.DisDump();
-            match = "1013   C4 F1 94 2F                VEJ  (C4),$F194,$1046\r\n";
+            match = "1013   C4 F1 94 2F                VEJ  (C4) \\ AWRD($F194) \\ ABRF($1046)\r\n";
             Assert.AreEqual(match, output, "VEJ  (C4),$F194,$1046");
 
             CPU.Run((ushort)(address + 0x17), (ushort)(address + 0x17));
             output = CPU.DisDump();
-            match = "1017   C5 0E AA 21                VHR  ($0E),$AA,$103C\r\n";
+            match = "1017   C5 0E AA 21                VHR  ($0E) \\ ABYT($AA) \\ ABRF($103C)\r\n";
             Assert.AreEqual(match, output, "VHR  ($0E),$AA,$103C");
 
             CPU.Run((ushort)(address + 0x1B), (ushort)(address + 0x1B));
@@ -1291,49 +1293,47 @@ namespace lh5801_Dis_Test
 
             CPU.Run((ushort)(address + 0x1C), (ushort)(address + 0x1C));
             output = CPU.DisDump();
-            match = "101C   C7 10 55                   VHS  ($10),$55\r\n";
+            match = "101C   C7 10 55                   VHS  ($10) \\ ABYT($55)\r\n";
             Assert.AreEqual(match, output, "VHS  ($10),$55");
 
             CPU.Run((ushort)(address + 0x1F), (ushort)(address + 0x1F));
             output = CPU.DisDump();
-            match = "101F   C8 04                      VEJ  (C8),$1025\r\n";
+            match = "101F   C8 04                      VEJ  (C8) \\ ABRF($1025)\r\n";
             Assert.AreEqual(match, output, "VEJ  (C8),$1025");
 
             CPU.Run((ushort)(address + 0x21), (ushort)(address + 0x21));
             output = CPU.DisDump();
-            match = "1021   C9 2A 55 AA                VZR  ($2A),$55,$AA\r\n";
+            match = "1021   C9 2A 55 AA                VZR  ($2A) \\ ABYT($55) \\ ABYT($AA)\r\n";
             Assert.AreEqual(match, output, "VZR  ($2A),$55,$AA");
 
             CPU.Run((ushort)(address + 0x25), (ushort)(address + 0x25));
             output = CPU.DisDump();
-            match = "1025   CA 65                      VEJ  (CA),$7865\r\n";
+            match = "1025   CA 65                      VEJ  (CA) \\ ABYTL($7865)\r\n";
             Assert.AreEqual(match, output, "VEJ  (CA),$7865");
 
             CPU.Run((ushort)(address + 0x27), (ushort)(address + 0x27));
             output = CPU.DisDump();
-            match = "1027   CB 2C 1A                   VZS  ($2C),$781A\r\n";
+            match = "1027   CB 2C 1A                   VZS  ($2C) \\ ABRF($1044)\r\n";
             Assert.AreEqual(match, output, "VZS  ($2C),$781A");
 
             CPU.Run((ushort)(address + 0x2A), (ushort)(address + 0x2A));
             output = CPU.DisDump();
-            match = "102A   CC 33                      VEJ  (CC),$7833\r\n";
+            match = "102A   CC 33                      VEJ  (CC) \\ ABYTL($7833)\r\n";
             Assert.AreEqual(match, output, "VEJ  (CC),$7833");
 
             CPU.Run((ushort)(address + 0x2C), (ushort)(address + 0x2C));
             output = CPU.DisDump();
-            match = "102C   CD 34 01 20 10 21 20       VMJ  ($34),$20,$1041\r\n";
-            match += "                                         ,$21,$1053\r\n";
-            match += "                                         \r\n";
+            match = "102C   CD 34 01 20 10 21 20       VMJ  ($34) \\ ABYT($01) \\ ABYT($20) \\ ABRF($1041) \\ ABYT($21) \\ ABRF($1053)\r\n";
             Assert.AreEqual(match, output, "VMJ ($34)");
 
             CPU.Run((ushort)(address + 0x33), (ushort)(address + 0x33));
             output = CPU.DisDump();
-            match = "1033   CE 58 7A                   VEJ  (CE),$58,$10B0\r\n";
+            match = "1033   CE 58 7A                   VEJ  (CE) \\ ABYT($58) \\ ABRF($10B0)\r\n";
             Assert.AreEqual(match, output, "VEJ  (CE),$58,$10B0");
 
             CPU.Run((ushort)(address + 0x36), (ushort)(address + 0x36));
             output = CPU.DisDump();
-            match = "1036   CF F4 55 AA                VVS  ($F4),$55AA\r\n";
+            match = "1036   CF F4 55 AA                VVS  ($F4) \\ AWRD($55AA)\r\n";
             Assert.AreEqual(match, output, "VVS  ($F4),$55AA");
         }
 
@@ -1439,13 +1439,13 @@ namespace lh5801_Dis_Test
                                         0xDA, 0xDB, 0xDC, 0xDD, 0xDE, 0x5A, 0xDF };
 
             CPU.addressLabels = false;  // don't use address lables
-            CPU.disModePC1500 = true;   // don't use PC-1500 disassembly mode
+            CPU.disModePC1500 = true;   // use PC-1500 disassembly mode
             CPU.libFileEnable = false;  // don't use lib file / segments
             CPU.WriteRAM_ME0(address, memVal);
 
             CPU.Run(address, (ushort)(address));
             String output = CPU.DisDump();
-            String match = "1000   D0 04 69                   VEJ  (D0),$04,$106C\r\n";
+            String match = "1000   D0 04 69                   VEJ  (D0) \\ ABYT($04) \\ ABRF($106C)\r\n";
             Assert.AreEqual(match, output, "VEJ  (D0),$04,$106C");
 
             CPU.Run((ushort)(address + 0x03), (ushort)(address + 0x03));
@@ -1455,7 +1455,7 @@ namespace lh5801_Dis_Test
 
             CPU.Run((ushort)(address + 0x04), (ushort)(address + 0x04));
             output = CPU.DisDump();
-            match = "1004   D2 0C 80                   VEJ  (D2),$0C,$80\r\n";
+            match = "1004   D2 0C 80                   VEJ  (D2) \\ ABRF($1013) \\ ABYT($80)\r\n";
             Assert.AreEqual(match, output, "VEJ  (D2),$0C,$80");
 
             CPU.Run((ushort)(address + 0x07), (ushort)(address + 0x07));
@@ -1465,7 +1465,7 @@ namespace lh5801_Dis_Test
 
             CPU.Run((ushort)(address + 0x08), (ushort)(address + 0x08));
             output = CPU.DisDump();
-            match = "1008   D4 A0                      VEJ  (D4),$A0\r\n";
+            match = "1008   D4 A0                      VEJ  (D4) \\ ABYT($A0)\r\n";
             Assert.AreEqual(match, output, "VEJ  (D4),$A0");
 
             CPU.Run((ushort)(address + 0x0A), (ushort)(address + 0x0A));
@@ -1475,7 +1475,7 @@ namespace lh5801_Dis_Test
 
             CPU.Run((ushort)(address + 0x0B), (ushort)(address + 0x0B));
             output = CPU.DisDump();
-            match = "100B   D6 A6                      VEJ  (D6),$A6\r\n";
+            match = "100B   D6 A6                      VEJ  (D6) \\ ABYT($A6)\r\n";
             Assert.AreEqual(match, output, "VEJ  (D6),$A6");
 
             CPU.Run((ushort)(address + 0x0D), (ushort)(address + 0x0D));
@@ -1515,7 +1515,7 @@ namespace lh5801_Dis_Test
 
             CPU.Run((ushort)(address + 0x14), (ushort)(address + 0x14));
             output = CPU.DisDump();
-            match = "1014   DE 5A                      VEJ  (DE),$1070\r\n";
+            match = "1014   DE 5A                      VEJ  (DE) \\ ABRF($1070)\r\n";
             Assert.AreEqual(match, output, "VEJ  (DE),$1070");
 
             CPU.Run((ushort)(address + 0x16), (ushort)(address + 0x16));
@@ -1717,7 +1717,7 @@ namespace lh5801_Dis_Test
 
             CPU.Run((ushort)(address + 0x03), (ushort)(address + 0x03));
             output = CPU.DisDump();
-            match = "1003   F4 78 99                   VEJ  (F4),$7899\r\n";
+            match = "1003   F4 78 99                   VEJ  (F4) \\ AWRD($7899)\r\n";
             Assert.AreEqual(match, output, "VEJ  (F4),$7899");
 
             CPU.Run((ushort)(address + 0x06), (ushort)(address + 0x06));
@@ -1727,7 +1727,7 @@ namespace lh5801_Dis_Test
 
             CPU.Run((ushort)(address + 0x07), (ushort)(address + 0x07));
             output = CPU.DisDump();
-            match = "1007   F6 78 86                   VEJ  (F6),$7886\r\n";
+            match = "1007   F6 78 86                   VEJ  (F6) \\ AWRD($7886)\r\n";
             Assert.AreEqual(match, output, "VEJ  (F6),7886");
 
             CPU.Run((ushort)(address + 0x0A), (ushort)(address + 0x0A));
@@ -2597,4 +2597,80 @@ namespace lh5801_Dis_Test
 
     }
 
+    [TestClass]
+    public class UnitTest_Misc
+    {
+        struct LABEL
+        {
+            public string name; // label name
+            public ushort size; // size is zero based
+
+            public LABEL(string name, ushort size)
+            {
+                this.name = name;
+                this.size = size;
+            }
+        }
+
+        //lh5801_Dis.lh5801_Dis CPU = new lh5801_Dis.lh5801_Dis();
+
+        [TestMethod]
+        public void ListUpperBound()
+        {
+            SortedList<ushort, LABEL> testList = new SortedList<ushort, LABEL>();
+
+            // test with empty list
+            int result = testList.UpperBound<ushort, LABEL>(0x1000);
+            Assert.AreEqual(-1, result, "Empty List");
+
+            // test with single entry with direct match
+            LABEL label = new LABEL("L1", 0x00);
+            testList.Add(0x1000, label);
+            result = testList.UpperBound<ushort, LABEL>(0x1000);
+            Assert.AreEqual(0, result, "Empty List");
+
+            // test with single entry no match
+            label = new LABEL("L2", 0x00);
+            testList.Clear();
+            testList.Add(0x1000, label);
+            result = testList.UpperBound<ushort, LABEL>(0x0900);
+            Assert.AreEqual(-1, result, "Empty List");
+
+            // test with single entry with match
+            label = new LABEL("L2", 0x00);
+            testList.Clear();
+            testList.Add(0x1000, label);
+            result = testList.UpperBound<ushort, LABEL>(0x1100);
+            Assert.AreEqual(0, result, "Empty List");
+
+            // set up list for multiple tests
+            testList.Clear();
+            for (int i = 0; i < 10; i+= 1)
+            {
+                label = new LABEL(String.Format("L{0}",i), 0x00);
+                testList.Add((ushort)(i * 0x0100 + 0x100), label);
+            }
+            
+            // exact match middle of list
+            result = testList.UpperBound<ushort, LABEL>(0x0800);
+            Assert.AreEqual(7, result, "Exact Match");
+
+            // no match, value < lowest key in list
+            result = testList.UpperBound<ushort, LABEL>(0x0010);
+            Assert.AreEqual(-1, result, "No Match");
+
+            // no match, value < lowest key in list
+            result = testList.UpperBound<ushort, LABEL>(0x0150);
+            Assert.AreEqual(0, result, "Match 1st in list");
+
+            // match end of list, value > highest key in list
+            result = testList.UpperBound<ushort, LABEL>(0x0B00);
+            Assert.AreEqual(9, result, "Match last in list");
+
+            // match 1 before end of list, value > (highest key in list - 1)
+            result = testList.UpperBound<ushort, LABEL>(0x0950);
+            Assert.AreEqual(8, result, "Match last in list");
+
+        }
+    }
 }
